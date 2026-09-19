@@ -25,7 +25,7 @@ const rooms = new Map();
 const MAX_PLAYERS = 4;
 const LEVEL_COUNT = Math.max(1, Number(process.env.LABYRUN_LEVEL_COUNT || 50));
 const REMATCH_MS = Math.max(5000, Number(process.env.LABYRUN_REMATCH_MS || 20000));
-const CHAR_IDS = new Set(['taco-tony','curry-barry','gassy-cassie','digestive-dale','brenda-beans','nervous-niko','colon-colin','spicy-priya']);
+const CHAR_IDS = new Set(['taco-tony','chili-willy','milkshake-mallory','yogurt-yoel','brenda-beans','prunejuice-paul','corndog-chris','spicy-yaspreet']);
 
 app.get('/', (_req,res)=>res.json({name:'LABYRUN multiplayer server',ok:true,rooms:rooms.size}));
 app.get('/health', (_req,res)=>res.json({ok:true,rooms:rooms.size,connections:io.engine.clientsCount}));
@@ -51,14 +51,40 @@ function roomOf(socket){ const code=socket.data.roomCode; return code ? rooms.ge
 function sameRoom(a,b){ return !!a && !!b && a===b; }
 function getPlayer(room,id){ return room?.players.get(id); }
 
+function publicStandings(room){
+  return [...(room.scoreboard?.values()||[])].map(row=>({
+    id:row.id,name:row.name,characterId:row.characterId||null,totalScore:Number(row.totalScore||0),roundScore:Number(row.roundScore||0)
+  })).sort((a,b)=>b.totalScore-a.totalScore || b.roundScore-a.roundScore || a.name.localeCompare(b.name));
+}
+
 function publicPostgame(room){
   if(!room.postgame) return null;
   return {
     rematchAt:room.postgame.rematchAt,
     nextLevelIndex:room.postgame.nextLevelIndex,
     votes:room.postgame.votes.size,
-    players:room.players.size
+    players:room.players.size,
+    standings:publicStandings(room)
   };
+}
+
+function applyScoreRows(room,rows){
+  if(!room.scoreboard) room.scoreboard=new Map();
+  for(const raw of Array.isArray(rows)?rows:[]){
+    const id=String(raw?.id||'').slice(0,80);
+    if(!id) continue;
+    const human=room.players.get(id);
+    if(!human && !id.startsWith('ai:')) continue;
+    const previous=room.scoreboard.get(id)||{id,totalScore:0,roundScore:0,name:'AI',characterId:null};
+    const roundScore=Math.max(0,Math.min(5000,Math.round(Number(raw?.roundScore)||0)));
+    room.scoreboard.set(id,{
+      id,
+      name:human?.name||cleanName(raw?.name||previous.name||'AI'),
+      characterId:human?.characterId||String(raw?.characterId||previous.characterId||'').slice(0,40)||null,
+      roundScore,
+      totalScore:Number(previous.totalScore||0)+roundScore
+    });
+  }
 }
 
 function publicRoom(room){
@@ -70,7 +96,7 @@ function publicRoom(room){
     postgame:publicPostgame(room),
     players:[...room.players.values()].map(p=>({
       id:p.id,name:p.name,characterId:p.characterId||null,ready:!!p.ready,
-      voiceEnabled:!!p.voiceEnabled,isHost:p.id===room.hostId
+      voiceEnabled:!!p.voiceEnabled,isHost:p.id===room.hostId,score:Number(room.scoreboard?.get(p.id)?.totalScore||0)
     }))
   };
 }
@@ -157,6 +183,7 @@ function leaveRoom(socket,{disconnect=false}={}){
   if(!room) return;
   const wasHost=room.hostId===socket.id;
   room.players.delete(socket.id);
+  room.scoreboard?.delete(socket.id);
   room.postgame?.votes.delete(socket.id);
   if(!disconnect) socket.leave(room.code);
   socket.data.roomCode=null;
@@ -204,7 +231,7 @@ io.on('connection', socket => {
     try{
       leaveRoom(socket);
       const code=makeCode();
-      const room={code,hostId:socket.id,players:new Map(),game:null,postgame:null,rematchTimer:null,levelIndex:0,raceSeq:0,createdAt:Date.now()};
+      const room={code,hostId:socket.id,players:new Map(),scoreboard:new Map(),game:null,postgame:null,rematchTimer:null,levelIndex:0,raceSeq:0,createdAt:Date.now()};
       rooms.set(code,room);
       joinRoom(socket,room,payload.name);
       ack({ok:true,code});
@@ -302,6 +329,7 @@ io.on('connection', socket => {
     const room=roomOf(socket);
     if(!room?.game||socket.id!==room.hostId||!validRacePayload(room,payload))return;
     const endedRaceId=room.game.id;
+    applyScoreRows(room,payload?.scoreRows);
     room.game=null;
     room.players.forEach(p=>p.ready=false);
 
