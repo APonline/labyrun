@@ -43,6 +43,10 @@ function makeCode(){
   return code;
 }
 function makeSeed(){ return crypto.randomBytes(4).readUInt32LE(0); }
+function makeRaceId(room){
+  room.raceSeq=(room.raceSeq||0)+1;
+  return `${room.code}-${room.raceSeq}-${makeSeed().toString(36)}`;
+}
 function roomOf(socket){ const code=socket.data.roomCode; return code ? rooms.get(code) : null; }
 function sameRoom(a,b){ return !!a && !!b && a===b; }
 function getPlayer(room,id){ return room?.players.get(id); }
@@ -80,11 +84,12 @@ function clearRematch(room){
 function buildStartPayload(room){
   const humans=[...room.players.values()];
   const seed=makeSeed();
+  const raceId=makeRaceId(room);
   const startDelayMs=2600;
   const startAt=Date.now()+startDelayMs;
-  room.game={seed,startAt,startedBy:room.hostId,startedAt:null,levelIndex:room.levelIndex||0};
+  room.game={id:raceId,seed,startAt,startedBy:room.hostId,startedAt:null,levelIndex:room.levelIndex||0,world:null};
   return {
-    code:room.code,seed,startAt,startDelayMs,hostId:room.hostId,
+    code:room.code,raceId,seed,startAt,startDelayMs,hostId:room.hostId,
     levelIndex:room.levelIndex||0,
     humans:humans.map(p=>({id:p.id,name:p.name,characterId:p.characterId})),
     aiSlots:Math.max(0,MAX_PLAYERS-humans.length)
@@ -199,7 +204,7 @@ io.on('connection', socket => {
     try{
       leaveRoom(socket);
       const code=makeCode();
-      const room={code,hostId:socket.id,players:new Map(),game:null,postgame:null,rematchTimer:null,levelIndex:0,createdAt:Date.now()};
+      const room={code,hostId:socket.id,players:new Map(),game:null,postgame:null,rematchTimer:null,levelIndex:0,raceSeq:0,createdAt:Date.now()};
       rooms.set(code,room);
       joinRoom(socket,room,payload.name);
       ack({ok:true,code});
@@ -243,7 +248,7 @@ io.on('connection', socket => {
       if(!room) throw new Error('Join a room first.');
       if(room.hostId!==socket.id) throw new Error('Only the host can start the race.');
       const payload=startRoomGame(room,{requireReady:true});
-      ack({ok:true,seed:payload.seed,startAt:payload.startAt,levelIndex:payload.levelIndex});
+      ack({ok:true,raceId:payload.raceId,seed:payload.seed,startAt:payload.startAt,levelIndex:payload.levelIndex});
     }catch(e){ ack({ok:false,error:e.message}); socket.emit('room:error',e.message); }
   });
 
@@ -258,24 +263,45 @@ io.on('connection', socket => {
     }catch(e){ ack({ok:false,error:e.message}); }
   });
 
+  const validRacePayload=(room,payload)=>!!room?.game && String(payload?.raceId||'')===String(room.game.id);
+
+  // The host generates the actual maze and sends it once. Guests use this exact
+  // world instead of independently reconstructing the labyrinth from a seed.
+  // That eliminates cross-browser/cache/version differences entirely.
+  socket.on('game:world',payload=>{
+    const room=roomOf(socket);
+    if(!room?.game || socket.id!==room.hostId || !validRacePayload(room,payload)) return;
+    const rows=payload?.mazeRows;
+    if(!Array.isArray(rows) || !rows.length || rows.length>500) return;
+    if(rows.some(r=>typeof r!=='string' || r.length>500 || /[^01]/.test(r))) return;
+    room.game.world=payload;
+    socket.to(room.code).emit('game:world',payload);
+  });
+
   socket.on('game:input',payload=>{
-    const room=roomOf(socket); if(!room?.game||socket.id===room.hostId)return;
+    const room=roomOf(socket);
+    if(!room?.game||socket.id===room.hostId||!validRacePayload(room,payload))return;
     io.to(room.hostId).emit('game:input',{from:socket.id,...payload});
   });
   socket.on('game:action',payload=>{
-    const room=roomOf(socket); if(!room?.game||socket.id===room.hostId)return;
+    const room=roomOf(socket);
+    if(!room?.game||socket.id===room.hostId||!validRacePayload(room,payload))return;
     io.to(room.hostId).emit('game:action',{from:socket.id,...payload});
   });
   socket.on('game:snapshot',payload=>{
-    const room=roomOf(socket); if(!room?.game||socket.id!==room.hostId)return;
+    const room=roomOf(socket);
+    if(!room?.game||socket.id!==room.hostId||!validRacePayload(room,payload))return;
     socket.to(room.code).emit('game:snapshot',payload);
   });
   socket.on('game:event',payload=>{
-    const room=roomOf(socket); if(!room?.game||socket.id!==room.hostId)return;
+    const room=roomOf(socket);
+    if(!room?.game||socket.id!==room.hostId||!validRacePayload(room,payload))return;
     socket.to(room.code).emit('game:event',payload);
   });
   socket.on('game:end',payload=>{
-    const room=roomOf(socket); if(!room?.game||socket.id!==room.hostId)return;
+    const room=roomOf(socket);
+    if(!room?.game||socket.id!==room.hostId||!validRacePayload(room,payload))return;
+    const endedRaceId=room.game.id;
     room.game=null;
     room.players.forEach(p=>p.ready=false);
 
@@ -283,7 +309,7 @@ io.on('connection', socket => {
     // self-contained, so clients cannot get stranded on REMATCH LOADING if the
     // separate postgame packet arrives late or is dropped during reconnect.
     const postgame=scheduleRematch(room,{emit:false});
-    io.to(room.code).emit('game:end',{...(payload||{}),postgame});
+    io.to(room.code).emit('game:end',{...(payload||{}),raceId:endedRaceId,postgame});
     emitPostgame(room);
   });
 
