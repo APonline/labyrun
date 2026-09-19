@@ -23,6 +23,8 @@ const io = new Server(server, {
 
 const rooms = new Map();
 const MAX_PLAYERS = 4;
+const LEVEL_COUNT = Math.max(1, Number(process.env.LABYRUN_LEVEL_COUNT || 50));
+const REMATCH_MS = Math.max(5000, Number(process.env.LABYRUN_REMATCH_MS || 20000));
 const CHAR_IDS = new Set(['taco-tony','curry-barry','gassy-cassie','digestive-dale','brenda-beans','nervous-niko','colon-colin','spicy-priya']);
 
 app.get('/', (_req,res)=>res.json({name:'LABYRUN multiplayer server',ok:true,rooms:rooms.size}));
@@ -42,11 +44,26 @@ function makeCode(){
 }
 function makeSeed(){ return crypto.randomBytes(4).readUInt32LE(0); }
 function roomOf(socket){ const code=socket.data.roomCode; return code ? rooms.get(code) : null; }
+function sameRoom(a,b){ return !!a && !!b && a===b; }
+function getPlayer(room,id){ return room?.players.get(id); }
+
+function publicPostgame(room){
+  if(!room.postgame) return null;
+  return {
+    rematchAt:room.postgame.rematchAt,
+    nextLevelIndex:room.postgame.nextLevelIndex,
+    votes:room.postgame.votes.size,
+    players:room.players.size
+  };
+}
+
 function publicRoom(room){
   return {
     code:room.code,
     hostId:room.hostId,
     gameActive:!!room.game,
+    levelIndex:room.levelIndex||0,
+    postgame:publicPostgame(room),
     players:[...room.players.values()].map(p=>({
       id:p.id,name:p.name,characterId:p.characterId||null,ready:!!p.ready,
       voiceEnabled:!!p.voiceEnabled,isHost:p.id===room.hostId
@@ -54,30 +71,118 @@ function publicRoom(room){
   };
 }
 function broadcastRoom(room){ io.to(room.code).emit('room:state',publicRoom(room)); }
-function getPlayer(room,id){ return room?.players.get(id); }
+
+function clearRematch(room){
+  if(room.rematchTimer){ clearTimeout(room.rematchTimer); room.rematchTimer=null; }
+  room.postgame=null;
+}
+
+function buildStartPayload(room){
+  const humans=[...room.players.values()];
+  const seed=makeSeed();
+  const startDelayMs=2600;
+  const startAt=Date.now()+startDelayMs;
+  room.game={seed,startAt,startedBy:room.hostId,startedAt:null,levelIndex:room.levelIndex||0};
+  return {
+    code:room.code,seed,startAt,startDelayMs,hostId:room.hostId,
+    levelIndex:room.levelIndex||0,
+    humans:humans.map(p=>({id:p.id,name:p.name,characterId:p.characterId})),
+    aiSlots:Math.max(0,MAX_PLAYERS-humans.length)
+  };
+}
+
+function startRoomGame(room,{requireReady=true}={}){
+  if(!room) throw new Error('Room not found.');
+  if(room.game) throw new Error('Race already started.');
+  const humans=[...room.players.values()];
+  if(!humans.length) throw new Error('Nobody is in the room. Impressive.');
+  if(humans.some(p=>!p.characterId)) throw new Error('Everyone must pick a racer first.');
+  if(requireReady && humans.some(p=>!p.ready)) throw new Error('Everyone must pick a racer and ready up first.');
+
+  clearRematch(room);
+  const payload=buildStartPayload(room);
+  io.to(room.code).emit('game:start',payload);
+  broadcastRoom(room);
+  return payload;
+}
+
+function emitPostgame(room){
+  if(!room.postgame) return;
+  io.to(room.code).emit('game:postgame',publicPostgame(room));
+  broadcastRoom(room);
+}
+
+function scheduleRematch(room,{emit=true}={}){
+  clearRematch(room);
+  room.levelIndex=Math.min((room.levelIndex||0)+1,LEVEL_COUNT-1);
+  room.postgame={
+    rematchAt:Date.now()+REMATCH_MS,
+    nextLevelIndex:room.levelIndex,
+    votes:new Set()
+  };
+  const info=publicPostgame(room);
+  if(emit) emitPostgame(room);
+  room.rematchTimer=setTimeout(()=>{
+    room.rematchTimer=null;
+    if(!rooms.has(room.code) || room.game || !room.postgame || !room.players.size) return;
+    try{
+      // Nobody has to press anything. Everyone still in the room gets dragged
+      // into the next progressively larger food court automatically.
+      startRoomGame(room,{requireReady:false});
+    }catch(e){
+      clearRematch(room);
+      io.to(room.code).emit('room:notice',`Automatic rematch stopped: ${e.message}`);
+      room.players.forEach(p=>p.ready=false);
+      broadcastRoom(room);
+    }
+  },REMATCH_MS);
+  return info;
+}
+
+function maybeStartVotedRematch(room){
+  if(!room?.postgame || room.game || !room.players.size) return;
+  const all=[...room.players.keys()].every(id=>room.postgame.votes.has(id));
+  if(!all) return;
+  try{ startRoomGame(room,{requireReady:false}); }
+  catch(e){ io.to(room.code).emit('room:notice',`Rematch stopped: ${e.message}`); }
+}
+
 function leaveRoom(socket,{disconnect=false}={}){
   const room=roomOf(socket);
   if(!room) return;
   const wasHost=room.hostId===socket.id;
   room.players.delete(socket.id);
+  room.postgame?.votes.delete(socket.id);
   if(!disconnect) socket.leave(room.code);
   socket.data.roomCode=null;
   socket.to(room.code).emit('voice:peer-left',{id:socket.id});
 
-  if(room.players.size===0){ rooms.delete(room.code); return; }
+  if(room.players.size===0){ clearRematch(room); rooms.delete(room.code); return; }
+
   if(wasHost){
+    const hadActiveRound=!!room.game || !!room.postgame;
     room.hostId=[...room.players.keys()][0];
-    if(room.game){
-      room.game=null;
-      io.to(room.code).emit('game:end',{reason:'host-left',message:'The host disconnected. Race returned to the lobby.'});
+    room.game=null;
+    clearRematch(room);
+    room.players.forEach(p=>p.ready=false);
+    if(hadActiveRound){
+      io.to(room.code).emit('game:end',{
+        reason:'host-left',
+        message:'The host left. The round is over and everyone is back in the lobby.'
+      });
     }
-    io.to(room.code).emit('room:notice','Host changed.');
+    io.to(room.code).emit('room:notice','Host left. A new host has been assigned.');
+  } else if(room.postgame){
+    emitPostgame(room);
+    maybeStartVotedRematch(room);
   }
   broadcastRoom(room);
 }
+
 function joinRoom(socket,room,name){
   if(socket.data.roomCode && socket.data.roomCode!==room.code) leaveRoom(socket);
   if(room.game) throw new Error('That race is already in progress.');
+  if(room.postgame) throw new Error('That room is between races. Try again when the next lobby opens.');
   if(!room.players.has(socket.id) && room.players.size>=MAX_PLAYERS) throw new Error('That room already has 4 players.');
   socket.join(room.code);
   socket.data.roomCode=room.code;
@@ -88,14 +193,13 @@ function joinRoom(socket,room,name){
   }
   broadcastRoom(room);
 }
-function sameRoom(a,b){ return !!a && !!b && a===b; }
 
 io.on('connection', socket => {
   socket.on('room:create',(payload={},ack=()=>{})=>{
     try{
       leaveRoom(socket);
       const code=makeCode();
-      const room={code,hostId:socket.id,players:new Map(),game:null,createdAt:Date.now()};
+      const room={code,hostId:socket.id,players:new Map(),game:null,postgame:null,rematchTimer:null,levelIndex:0,createdAt:Date.now()};
       rooms.set(code,room);
       joinRoom(socket,room,payload.name);
       ack({ok:true,code});
@@ -113,9 +217,7 @@ io.on('connection', socket => {
     }catch(e){ ack({ok:false,error:e.message}); socket.emit('room:error',e.message); }
   });
 
-  socket.on('room:leave',(_payload={},ack=()=>{})=>{
-    leaveRoom(socket); ack({ok:true});
-  });
+  socket.on('room:leave',(_payload={},ack=()=>{})=>{ leaveRoom(socket); ack({ok:true}); });
 
   socket.on('player:update',(patch={})=>{
     const room=roomOf(socket),player=getPlayer(room,socket.id); if(!room||!player)return;
@@ -140,23 +242,20 @@ io.on('connection', socket => {
     try{
       if(!room) throw new Error('Join a room first.');
       if(room.hostId!==socket.id) throw new Error('Only the host can start the race.');
-      if(room.game) throw new Error('Race already started.');
-      const humans=[...room.players.values()];
-      if(!humans.length) throw new Error('Nobody is in the room. Impressive.');
-      if(humans.some(p=>!p.characterId||!p.ready)) throw new Error('Everyone must pick a racer and ready up first.');
-      const seed=makeSeed();
-      const startDelayMs=2600;
-      const startAt=Date.now()+startDelayMs;
-      room.game={seed,startAt,startedBy:socket.id,startedAt:null};
-      const payload={
-        code:room.code,seed,startAt,startDelayMs,hostId:room.hostId,
-        humans:humans.map(p=>({id:p.id,name:p.name,characterId:p.characterId})),
-        aiSlots:Math.max(0,MAX_PLAYERS-humans.length)
-      };
-      io.to(room.code).emit('game:start',payload);
-      broadcastRoom(room);
-      ack({ok:true,seed,startAt});
+      const payload=startRoomGame(room,{requireReady:true});
+      ack({ok:true,seed:payload.seed,startAt:payload.startAt,levelIndex:payload.levelIndex});
     }catch(e){ ack({ok:false,error:e.message}); socket.emit('room:error',e.message); }
+  });
+
+  socket.on('game:rematch',(_payload={},ack=()=>{})=>{
+    const room=roomOf(socket);
+    try{
+      if(!room?.postgame) throw new Error('There is no rematch waiting.');
+      room.postgame.votes.add(socket.id);
+      emitPostgame(room);
+      ack({ok:true,votes:room.postgame?.votes.size||0,players:room.players.size});
+      maybeStartVotedRematch(room);
+    }catch(e){ ack({ok:false,error:e.message}); }
   });
 
   socket.on('game:input',payload=>{
@@ -178,10 +277,14 @@ io.on('connection', socket => {
   socket.on('game:end',payload=>{
     const room=roomOf(socket); if(!room?.game||socket.id!==room.hostId)return;
     room.game=null;
-    io.to(room.code).emit('game:end',payload||{});
-    // Keep the room together for rematch, but reset ready flags.
     room.players.forEach(p=>p.ready=false);
-    broadcastRoom(room);
+
+    // Build the rematch state BEFORE the end packet. That makes the end event
+    // self-contained, so clients cannot get stranded on REMATCH LOADING if the
+    // separate postgame packet arrives late or is dropped during reconnect.
+    const postgame=scheduleRematch(room,{emit:false});
+    io.to(room.code).emit('game:end',{...(payload||{}),postgame});
+    emitPostgame(room);
   });
 
   for(const event of ['voice:offer','voice:answer','voice:candidate']){
