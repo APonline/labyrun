@@ -609,12 +609,32 @@
     $('#roomRoster').innerHTML=next.players.map(p=>{
       const c=charById(p.characterId);
       const speaking=(voiceLevels[p.id]||0)>.045;
+      const food=c?.favouriteFood;
       return `<div class="roster-row">
-        <div class="roster-avatar">${c?`<img src="${c.portrait}" alt="">`:'❔'}</div>
-        <div class="roster-copy"><b>${p.isHost?'👑 ':''}${p.name}${p.id===MP.getMyId()?' (YOU)':''}</b><small>${c?c.name:'Choosing racer…'}${Number(p.score||0)>0?` • ${p.score} PTS`:''}</small></div>
+        <div class="roster-avatar">${c?`<img src="${c.portrait}" alt="${c.name}">`:'❔'}</div>
+        <div class="roster-food" title="${food?.name||'Favourite food'}">${food?.asset?`<img src="${food.asset}" alt="${food.name||'Favourite food'}">`:'—'}</div>
+        <div class="roster-copy"><b>${p.isHost?'👑 ':''}${p.name}${p.id===MP.getMyId()?' (YOU)':''}</b><small>${c?c.name:'Choosing racer…'} • ${Number(p.score||0)} PTS</small></div>
         <div class="roster-state ${p.ready?'ready':'waiting'}"><span class="voice-dot ${p.voiceEnabled?'on':''} ${speaking?'speaking':''}"></span>${p.ready?'READY':'WAITING'}</div>
       </div>`;
     }).join('');
+
+    const selectedIndex=clamp(Number(next.levelIndex)||0,0,levelCount()-1)|0;
+    const completedIndex=Number.isFinite(Number(next.lastCompletedLevelIndex))&&next.lastCompletedLevelIndex!==null
+      ? clamp(Number(next.lastCompletedLevelIndex),0,levelCount()-1)|0
+      : null;
+    const selectedLevel=levelFor(selectedIndex),selectedWorld=PRODUCT?.worldForLevel?.(selectedIndex)||worldDef('mall');
+    const completedLevel=completedIndex===null?null:levelFor(completedIndex);
+    const completedWorld=completedIndex===null?null:(PRODUCT?.worldForLevel?.(completedIndex)||worldDef('mall'));
+    const completedCount=completedIndex===null?0:completedIndex+1;
+    if($('#runProgressCurrent'))$('#runProgressCurrent').textContent=`${completedCount} COMPLETE • ${selectedIndex+1}/${levelCount()} NEXT`;
+    if($('#runProgressWorld'))$('#runProgressWorld').textContent=completedLevel
+      ? `Same room run • queued for ${selectedWorld.icon||''} ${selectedWorld.name}`.trim()
+      : `Fresh room • ${selectedWorld.icon||''} ${selectedWorld.name}`.trim();
+    if($('#runProgressCompleted'))$('#runProgressCompleted').textContent=completedLevel?`COURT ${completedIndex+1} / ${levelCount()}`:'—';
+    if($('#runProgressCompletedWorld'))$('#runProgressCompletedWorld').textContent=completedLevel?`${completedWorld.icon||''} ${completedWorld.name} • ${completedLevel.name}`.trim():'No races completed in this room yet';
+    if($('#runProgressNext'))$('#runProgressNext').textContent=`COURT ${selectedIndex+1} / ${levelCount()}`;
+    if($('#runProgressNextWorld'))$('#runProgressNextWorld').textContent=`${selectedWorld.icon||''} ${selectedWorld.name} • ${selectedLevel.name}`.trim();
+
     const allReady=next.players.length>0 && next.players.every(p=>p.ready&&p.characterId);
     const isHost=next.hostId===MP.getMyId();
     const roomWorld=PRODUCT?.worldForLevel?.(next.levelIndex||0)||worldDef('mall');
@@ -631,7 +651,7 @@
       ? `${lobbyMode.name} • ${roomWorld.name} is starting…`
       : allReady
         ? (isHost?`Everyone is ready. START ${lobbyMode.name.toUpperCase()} in ${roomWorld.name}.`:`Everyone is ready. Waiting for the host to start ${lobbyMode.name} in ${roomWorld.name}.`)
-        : `${lobbyMode.icon} ${lobbyMode.name.toUpperCase()} • ${roomWorld.name} • ${lobbyLevel.name}. Pick racers and ready up. Empty slots become AI.`;
+        : `${lobbyMode.icon} ${lobbyMode.name.toUpperCase()} • NEXT ROUND: COURT ${(Number(next.levelIndex)||0)+1}/${levelCount()} • ${roomWorld.name} • ${lobbyLevel.name}. Pick racers and ready up. Empty slots become AI.`;
     const vs=VOICE?.getState?.()||{};
     $('#voiceSummary').textContent=vs.joined?(vs.muted?'Joined • mic muted':`Joined • ${Math.max(0,next.players.filter(p=>p.voiceEnabled).length-1)} friend(s) connected`):'Not joined';
     $('#joinVoiceBtn').classList.toggle('hidden',!!vs.joined);
@@ -3214,7 +3234,30 @@
       else{mctx.font=`${size}px system-ui`;mctx.textAlign='center';mctx.textBaseline='middle';mctx.fillText('⭐',px,py);}
       mctx.restore();
     });
-    players.forEach(p=>worldDot(p.x,p.y,p.isLocal?'#fff':p.color,p.isLocal?5:3));
+    players.forEach(p=>{
+      const px=ox+p.x*cell,py=oy+p.y*cell;
+      const food=p.char?.favouriteFood;
+      const size=Math.max(12,Math.min(24,cell*5.2));
+      const ring=p.isLocal?'#ffffff':(p.color||'#d8ff5f');
+      const img=food?.asset?getImage(food.asset):null;
+      if(!img && food?.asset){
+        const pending=imageCache.get(food.asset);
+        if(pending && !pending._labyrunPlayerMapHook){
+          pending._labyrunPlayerMapHook=true;
+          pending.addEventListener('load',()=>{if(mapOpen)requestAnimationFrame(drawMap);},{once:true});
+        }
+      }
+      mctx.save();
+      mctx.fillStyle='rgba(10,8,10,.90)';
+      mctx.strokeStyle=ring;
+      mctx.lineWidth=p.isLocal?3:2;
+      mctx.beginPath();mctx.arc(px,py,size*.64,0,Math.PI*2);mctx.fill();mctx.stroke();
+      if(img)mctx.drawImage(img,px-size/2,py-size/2,size,size);
+      else{
+        mctx.fillStyle=ring;mctx.font=`${Math.max(9,size*.72)}px system-ui`;mctx.textAlign='center';mctx.textBaseline='middle';mctx.fillText('●',px,py);
+      }
+      mctx.restore();
+    });
   }
 
   function drawResult(){
