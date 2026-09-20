@@ -26,6 +26,8 @@ const MAX_PLAYERS = 4;
 const LEVEL_COUNT = Math.max(1, Number(process.env.LABYRUN_LEVEL_COUNT || 50));
 const REMATCH_MS = Math.max(5000, Number(process.env.LABYRUN_REMATCH_MS || 20000));
 const CHAR_IDS = new Set(['taco-tony','chili-willy','milkshake-mallory','yogurt-yoel','brenda-beans','prunejuice-paul','corndog-chris','spicy-yaspreet']);
+const MODE_IDS = new Set(['classic','sudden-shit','one-throne','no-map','super-specials','constipation','diarrhea']);
+const DIFFICULTY_IDS = new Set(['casual','standard','spicy']);
 
 app.get('/', (_req,res)=>res.json({name:'LABYRUN multiplayer server',ok:true,rooms:rooms.size}));
 app.get('/health', (_req,res)=>res.json({ok:true,rooms:rooms.size,connections:io.engine.clientsCount}));
@@ -93,6 +95,8 @@ function publicRoom(room){
     hostId:room.hostId,
     gameActive:!!room.game,
     levelIndex:room.levelIndex||0,
+    modeId:room.modeId||'classic',
+    difficultyId:room.difficultyId||'standard',
     postgame:publicPostgame(room),
     players:[...room.players.values()].map(p=>({
       id:p.id,name:p.name,characterId:p.characterId||null,ready:!!p.ready,
@@ -113,10 +117,12 @@ function buildStartPayload(room){
   const raceId=makeRaceId(room);
   const startDelayMs=2600;
   const startAt=Date.now()+startDelayMs;
-  room.game={id:raceId,seed,startAt,startedBy:room.hostId,startedAt:null,levelIndex:room.levelIndex||0,world:null};
+  room.game={id:raceId,seed,startAt,startedBy:room.hostId,startedAt:null,levelIndex:room.levelIndex||0,modeId:room.modeId||'classic',difficultyId:room.difficultyId||'standard',world:null};
   return {
     code:room.code,raceId,seed,startAt,startDelayMs,hostId:room.hostId,
     levelIndex:room.levelIndex||0,
+    modeId:room.modeId||'classic',
+    difficultyId:room.difficultyId||'standard',
     humans:humans.map(p=>({id:p.id,name:p.name,characterId:p.characterId})),
     aiSlots:Math.max(0,MAX_PLAYERS-humans.length)
   };
@@ -231,7 +237,7 @@ io.on('connection', socket => {
     try{
       leaveRoom(socket);
       const code=makeCode();
-      const room={code,hostId:socket.id,players:new Map(),scoreboard:new Map(),game:null,postgame:null,rematchTimer:null,levelIndex:0,raceSeq:0,createdAt:Date.now()};
+      const room={code,hostId:socket.id,players:new Map(),scoreboard:new Map(),game:null,postgame:null,rematchTimer:null,levelIndex:0,modeId:'classic',difficultyId:'standard',raceSeq:0,createdAt:Date.now()};
       rooms.set(code,room);
       joinRoom(socket,room,payload.name);
       ack({ok:true,code});
@@ -269,13 +275,38 @@ io.on('connection', socket => {
     broadcastRoom(room);
   });
 
+  socket.on('room:settings',(patch={},ack=()=>{})=>{
+    try{
+      const room=roomOf(socket);
+      if(!room) throw new Error('Join a room first.');
+      if(room.hostId!==socket.id) throw new Error('Only the host can change game settings.');
+      if(room.game||room.postgame) throw new Error('Game settings are locked between race start and the next lobby.');
+      if(patch.modeId!==undefined){
+        const id=String(patch.modeId||'');
+        if(!MODE_IDS.has(id)) throw new Error('Unknown game mode.');
+        room.modeId=id;
+      }
+      if(patch.difficultyId!==undefined){
+        const id=String(patch.difficultyId||'');
+        if(!DIFFICULTY_IDS.has(id)) throw new Error('Unknown difficulty.');
+        room.difficultyId=id;
+      }
+      if(patch.levelIndex!==undefined){
+        const idx=Math.max(0,Math.min(LEVEL_COUNT-1,Math.floor(Number(patch.levelIndex)||0)));
+        room.levelIndex=idx;
+      }
+      broadcastRoom(room);
+      ack({ok:true,modeId:room.modeId,difficultyId:room.difficultyId,levelIndex:room.levelIndex});
+    }catch(e){ack({ok:false,error:e.message});}
+  });
+
   socket.on('game:start',(_payload={},ack=()=>{})=>{
     const room=roomOf(socket);
     try{
       if(!room) throw new Error('Join a room first.');
       if(room.hostId!==socket.id) throw new Error('Only the host can start the race.');
       const payload=startRoomGame(room,{requireReady:true});
-      ack({ok:true,raceId:payload.raceId,seed:payload.seed,startAt:payload.startAt,levelIndex:payload.levelIndex});
+      ack({ok:true,raceId:payload.raceId,seed:payload.seed,startAt:payload.startAt,levelIndex:payload.levelIndex,modeId:payload.modeId,difficultyId:payload.difficultyId});
     }catch(e){ ack({ok:false,error:e.message}); socket.emit('room:error',e.message); }
   });
 

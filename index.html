@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>LABYRUN: Bathroom Emergency</title>
-  <link rel="stylesheet" href="src/styles/game.css?v=3.13-iso-voice" />
+  <link rel="stylesheet" href="src/styles/game.css?v=4.1-props-career" />
 </head>
 <body>
   <div id="app">
@@ -20,20 +20,60 @@
       <div class="menu-card">
         <img class="menu-logo" src="assets/ui/labyrun-logo.png" alt="LABYRUN" />
         <div class="eyebrow menu-eyebrow">A completely dignified maze experience</div>
-        <p class="tagline">You came for tacos. You stayed because there are only two toilets.</p>
+        <p class="tagline">Seven modes. Six worlds. Four racers. Usually not enough toilets.</p>
         <div class="menu-actions">
-          <button id="soloBtn" class="primary">Solo vs 3 AI</button>
+          <button id="soloBtn" class="primary">Play Solo</button>
           <button id="multiBtn">Multiplayer Room</button>
+          <button id="careerBtn">Career</button>
           <button id="settingsBtn">Settings</button>
           <button id="controlsBtn">Controls</button>
           <button id="howBtn">How It Works</button>
         </div>
-        <div class="tiny">Keyboard + gamepad + touch supported • tune the chaos in Settings</div>
+        <div class="tiny">Career progression • achievements • 50-court world tour • keyboard + gamepad + touch</div>
       </div>
       <div class="food-stand taco">🌮<span>TACO STAND</span></div>
       <div class="food-stand curry">🍛<span>CURRY STAND</span></div>
     </section>
 
+    <section id="playSetupScreen" class="screen">
+      <div class="panel product-setup-panel">
+        <div class="row-between settings-heading">
+          <div><div class="eyebrow">Build your disaster</div><h2>Play Setup</h2></div>
+          <button class="backBtn top-back">Back</button>
+        </div>
+        <div class="product-setup-grid">
+          <div class="setup-section">
+            <div class="setup-title"><span>GAME MODE</span><b id="setupModeName">Classic</b></div>
+            <div id="modeGrid" class="mode-grid"></div>
+          </div>
+          <div class="setup-section">
+            <div class="setup-title"><span>STARTING WORLD</span><b id="setupWorldName">Mall Food Court</b></div>
+            <div id="worldGrid" class="world-grid"></div>
+          </div>
+        </div>
+        <div class="setup-bottom">
+          <label class="difficulty-select"><span>DIFFICULTY</span><select id="difficultySelect"></select><small id="difficultyDescription"></small></label>
+          <div id="setupSummary" class="setup-summary"></div>
+          <button id="continueToCharacterBtn" class="primary">Choose Racer</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="careerScreen" class="screen">
+      <div class="panel career-panel">
+        <div class="row-between settings-heading">
+          <div><div class="eyebrow">Permanent local profile</div><h2>LABYRUN Career</h2></div>
+          <button class="backBtn top-back">Back</button>
+        </div>
+        <div id="careerHero" class="career-hero"></div>
+        <div id="careerStats" class="career-stats"></div>
+        <div class="career-section-heading"><div><span>RACER PREFERENCE</span><b id="characterUsageTotal">0 PICKS</b></div><small>Your character order ranked by actual usage. This data is structured for future leaderboard/profile syncing.</small></div>
+        <div id="characterUsageList" class="character-usage-list"></div>
+        <div class="career-section-heading"><div><span>ACHIEVEMENTS</span><b id="achievementCount">0 / 0</b></div><small>Stored locally in this browser for the MVP product build.</small></div>
+        <div id="achievementGrid" class="achievement-grid"></div>
+        <div class="career-footer"><button id="resetCareerBtn">Reset Local Career</button></div>
+      </div>
+    </section>
 
     <section id="settingsScreen" class="screen">
       <div class="panel settings-panel">
@@ -116,12 +156,13 @@
         <h2>How this disaster works</h2>
         <ul>
           <li>Four racers begin at the food stand and race toward the maze exit.</li>
-          <li>You get a bird's-eye look at the full labyrinth before the camera dives down into the maze.</li>
+          <li>The opening camera shows the EXIT, pulls back in the same isometric angle to reveal the labyrinth, then dives into the shared start.</li>
           <li>Shift uses stamina for a normal sprint. During a bowel emergency, sprinting also raises your poop risk.</li>
           <li>When the bowel alarm hits, the EXIT stops mattering. Two one-use toilets become the only safe havens.</li>
           <li>You may open the full map only <b>5 times</b>. Every peek adds bowel pressure.</li>
           <li>The closer you are to disaster, the slower and more ridiculous your walk becomes.</li>
-          <li>The first two racers to claim the two toilets survive. The other two immediately lose control of the situation.</li>
+          <li>Classic uses two toilets. Alternate modes can remove the map, accelerate the bowel event, supercharge specials or reduce the entire race to one throne.</li>
+          <li>The 50-court campaign moves through six themed worlds, with persistent local XP, career stats and achievements.</li>
         </ul>
         <button class="backBtn">Back</button>
       </div>
@@ -178,6 +219,13 @@
             </div>
           </div>
 
+          <div id="hostGameSettings" class="host-game-settings hidden">
+            <div class="host-setting"><span>HOST MODE</span><select id="hostModeSelect"></select></div>
+            <div class="host-setting"><span>STARTING WORLD</span><select id="hostWorldSelect"></select></div>
+            <div class="host-setting"><span>DIFFICULTY</span><select id="hostDifficultySelect"></select></div>
+            <small>Host controls the rules for everyone. Settings lock when the race starts.</small>
+          </div>
+
           <div class="lobby-columns">
             <div>
               <div class="lobby-section-title">PLAYERS</div>
@@ -211,6 +259,7 @@
         <div id="touchHint" class="touch-hint">DRAG LEFT SIDE TO MOVE</div>
       </div>
       <div id="hud" class="hud">
+        <div id="gameIdentity" class="game-identity"><span id="gameWorldLabel">WORLD</span><b id="gameModeLabel">CLASSIC</b></div>
         <div class="hud-left">
           <div class="hud-card stamina-card">
             <span class="hud-label">SPRINT STAMINA</span>
@@ -272,6 +321,7 @@
           <h2 id="resultTitle">Winner!</h2>
           <p id="resultText"></p>
           <div id="resultLevel" class="result-level"></div>
+          <div id="careerReward" class="career-reward hidden"></div>
           <div id="scoreboard" class="scoreboard hidden"><div class="scoreboard-title">TOTAL SCORE</div><div id="scoreboardRows"></div></div>
           <div id="rematchCountdown" class="result-rematch hidden">
             <span>NEXT FOOD COURT STARTS AUTOMATICALLY IN</span>
@@ -285,13 +335,15 @@
   </div>
 
   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
-  <script src="src/config/game-config.js?v=3.13-iso-voice"></script>
-  <script src="src/config/network-config.js?v=3.13-iso-voice"></script>
-  <script src="src/config/user-settings.js?v=3.13-iso-voice"></script>
-  <script src="src/data/characters.js?v=3.13-iso-voice"></script>
-  <script src="src/audio/audio-manager.js?v=3.13-iso-voice"></script>
-  <script src="src/network/multiplayer.js?v=3.13-iso-voice"></script>
-  <script src="src/network/voice-chat.js?v=3.13-iso-voice"></script>
-  <script src="src/game/game.js?v=3.13-iso-voice"></script>
+  <script src="src/data/product-content.js?v=4.1-props-career"></script>
+  <script src="src/config/game-config.js?v=4.1-props-career"></script>
+  <script src="src/config/network-config.js?v=4.1-props-career"></script>
+  <script src="src/config/user-settings.js?v=4.1-props-career"></script>
+  <script src="src/profile/player-profile.js?v=4.1-props-career"></script>
+  <script src="src/data/characters.js?v=4.1-props-career"></script>
+  <script src="src/audio/audio-manager.js?v=4.1-props-career"></script>
+  <script src="src/network/multiplayer.js?v=4.1-props-career"></script>
+  <script src="src/network/voice-chat.js?v=4.1-props-career"></script>
+  <script src="src/game/game.js?v=4.1-props-career"></script>
 </body>
 </html>

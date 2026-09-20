@@ -131,6 +131,7 @@
     joinRoom: (code,name) => request('room:join',{code,name}),
     leaveRoom: () => request('room:leave',{}),
     updatePlayer: patch => send('player:update',patch),
+    updateRoomSettings: patch => request('room:settings',patch),
     startGame: () => request('game:start',{}),
     requestRematch: () => request('game:rematch',{}),
     sendWorld: payload => { if(socket?.connected) socket.emit('game:world',payload); },

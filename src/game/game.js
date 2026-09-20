@@ -18,6 +18,8 @@
   const SETTINGS = window.LabyrunSettings;
   const MP = window.LabyrunMultiplayer;
   const VOICE = window.LabyrunVoice;
+  const PRODUCT = window.LABYRUN_PRODUCT;
+  const PROFILE = window.LabyrunProfile;
   const lerp = (a,b,t) => a + (b-a) * t;
   const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
   let gameplayRandom = Math.random;
@@ -49,6 +51,20 @@
   const isTouchDevice = window.matchMedia?.('(pointer: coarse)')?.matches || ('ontouchstart' in window);
   const canvas = $('#gameCanvas');
   document.documentElement.classList.toggle('touch-device', !!isTouchDevice);
+
+  const savedProfile = PROFILE?.get?.() || {};
+  let selectedModeId = PRODUCT?.mode(savedProfile.lastModeId)?.id || 'classic';
+  let selectedWorldId = PRODUCT?.world(savedProfile.lastWorldId)?.id || 'mall';
+  let selectedDifficultyId = PRODUCT?.difficulty(savedProfile.difficultyId)?.id || 'standard';
+  let activeModeId = selectedModeId;
+  let activeDifficultyId = selectedDifficultyId;
+  const modeDef = id => PRODUCT?.mode?.(id) || {id:'classic',name:'Classic',icon:'🚽',rules:{},xpMultiplier:1};
+  const worldDef = id => PRODUCT?.world?.(id) || PRODUCT?.worlds?.[0] || {id:'mall',name:'Mall Food Court',icon:'🛍️',startLevelIndex:0};
+  const difficultyDef = id => PRODUCT?.difficulty?.(id) || {id:'standard',name:'Standard',aiScale:1,bowelScale:1,xpMultiplier:1};
+  const activeMode = () => modeDef(activeModeId);
+  const activeRules = () => activeMode().rules || {};
+  const activeDifficulty = () => difficultyDef(activeDifficultyId);
+  const activeWorld = () => PRODUCT?.worldForLevel?.(activeLevelIndex) || worldDef(selectedWorldId);
 
   // ============================================================
   // CHARACTER SELECT
@@ -157,12 +173,56 @@
     show('#menuScreen');
   };
 
-  $('#soloBtn').onclick = () => { AUDIO.ensure(); show('#characterScreen'); };
+  function renderPlaySetup(){
+    const modeWrap=$('#modeGrid'),worldWrap=$('#worldGrid'),difficulty=$('#difficultySelect');
+    if(modeWrap){
+      modeWrap.innerHTML=(PRODUCT?.modes||[]).map(m=>`<button class="mode-card ${m.id===selectedModeId?'selected':''}" data-mode="${m.id}"><span class="mode-icon">${m.icon}</span><span><small>${m.tag}</small><b>${m.name}</b><em>${m.description}</em></span></button>`).join('');
+      modeWrap.querySelectorAll('[data-mode]').forEach(btn=>btn.addEventListener('click',()=>{selectedModeId=btn.dataset.mode;PROFILE?.setPreference?.('lastModeId',selectedModeId);renderPlaySetup();}));
+    }
+    if(worldWrap){
+      worldWrap.innerHTML=(PRODUCT?.worlds||[]).map(w=>`<button class="world-card ${w.id===selectedWorldId?'selected':''}" data-world="${w.id}"><span class="world-icon">${w.icon}</span><span><b>${w.name}</b><small>${w.courts} COURTS</small><em>${w.tagline}</em></span></button>`).join('');
+      worldWrap.querySelectorAll('[data-world]').forEach(btn=>btn.addEventListener('click',()=>{selectedWorldId=btn.dataset.world;PROFILE?.setPreference?.('lastWorldId',selectedWorldId);renderPlaySetup();}));
+    }
+    if(difficulty){
+      difficulty.innerHTML=(PRODUCT?.difficulties||[]).map(d=>`<option value="${d.id}" ${d.id===selectedDifficultyId?'selected':''}>${d.name}</option>`).join('');
+      const d=difficultyDef(selectedDifficultyId);$('#difficultyDescription').textContent=d.description||'';
+    }
+    const m=modeDef(selectedModeId),w=worldDef(selectedWorldId),d=difficultyDef(selectedDifficultyId);
+    $('#setupModeName').textContent=`${m.icon} ${m.name}`;
+    $('#setupWorldName').textContent=`${w.icon} ${w.name}`;
+    $('#setupSummary').innerHTML=`<span>RUN</span><b>${m.name}</b><i>in</i><b>${w.name}</b><i>on</i><b>${d.name}</b>`;
+  }
+
+  function renderCareer(){
+    const st=PROFILE?.get?.()||{},prog=PROFILE?.progress?.()||{level:1,current:0,needed:1,total:0};
+    const winRate=st.races?Math.round((st.wins/st.races)*100):0;
+    $('#careerHero').innerHTML=`<div class="career-level"><span>PLAYER LEVEL</span><b>${prog.level}</b></div><div class="career-xp"><div><span>${prog.current} / ${prog.needed} XP</span><strong>${prog.total} TOTAL XP</strong></div><div class="career-xp-track"><i style="width:${Math.min(100,(prog.current/prog.needed)*100)}%"></i></div></div>`;
+    $('#careerStats').innerHTML=[['RACES',st.races||0],['WINS',st.wins||0],['WIN RATE',`${winRate}%`],['ESCAPES',st.escapes||0],['TOILET SAVES',st.toiletSurvivals||0],['CAREER SCORE',st.careerScore||0],['FAVOURITE 1UPS',st.favoriteFoods||0],['SPECIALS USED',st.specialUses||0]].map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('');
+    const usage=PROFILE?.characterUsageRows?.()||[];
+    const usageTotal=usage.reduce((sum,row)=>sum+Number(row.picks||0),0);
+    const usageTotalEl=$('#characterUsageTotal');if(usageTotalEl)usageTotalEl.textContent=`${usageTotal} PICK${usageTotal===1?'':'S'}`;
+    const usageList=$('#characterUsageList');
+    if(usageList)usageList.innerHTML=usage.map(row=>`<div class="character-usage-row ${row.picks?'used':'unused'}"><b class="character-usage-rank">#${row.rank}</b><div class="character-usage-face">${row.portrait?`<img src="${row.portrait}" alt="">`:row.shortName.slice(0,1)}</div><div class="character-usage-copy"><strong>${row.name}</strong><span><i style="width:${row.share}%"></i></span></div><div class="character-usage-count"><b>${row.picks}</b><small>${row.picks===1?'USE':'USES'}${usageTotal?` • ${row.share}%`:''}</small></div></div>`).join('');
+    const ach=PROFILE?.achievementRows?.()||[];
+    $('#achievementCount').textContent=`${ach.filter(a=>a.unlocked).length} / ${ach.length}`;
+    $('#achievementGrid').innerHTML=ach.map(a=>`<div class="achievement ${a.unlocked?'unlocked':'locked'}"><span>${a.unlocked?a.icon:'🔒'}</span><div><b>${a.name}</b><small>${a.description}</small></div></div>`).join('');
+  }
+
+  $('#soloBtn').onclick = () => { AUDIO.ensure(); renderPlaySetup(); show('#playSetupScreen'); };
+  $('#careerBtn').onclick = () => { renderCareer(); show('#careerScreen'); };
   $('#multiBtn').onclick = () => show('#roomScreen');
   $('#howBtn').onclick = () => show('#howScreen');
   $('#settingsBtn').onclick = () => { syncSettingsUi(); show('#settingsScreen'); };
   $('#controlsBtn').onclick = () => { refreshGamepadStatus(); setControlTab(isTouchDevice?'touch':'keyboard'); show('#controlsScreen'); };
   document.querySelectorAll('.backBtn').forEach(b => b.onclick = () => show('#menuScreen'));
+  $('#characterScreen .backBtn').onclick=()=>{renderPlaySetup();show('#playSetupScreen');};
+  $('#difficultySelect')?.addEventListener('change',e=>{selectedDifficultyId=e.target.value;PROFILE?.setPreference?.('difficultyId',selectedDifficultyId);renderPlaySetup();});
+  $('#continueToCharacterBtn')?.addEventListener('click',()=>{
+    const w=worldDef(selectedWorldId);soloLevelIndex=Number(w.startLevelIndex||0);activeModeId=selectedModeId;activeDifficultyId=selectedDifficultyId;
+    PROFILE?.setPreference?.('lastModeId',selectedModeId);PROFILE?.setPreference?.('lastWorldId',selectedWorldId);PROFILE?.setPreference?.('difficultyId',selectedDifficultyId);
+    show('#characterScreen');
+  });
+  $('#resetCareerBtn')?.addEventListener('click',()=>{if(confirm('Reset all local LABYRUN career progress on this browser?')){PROFILE?.reset?.();renderCareer();}});
 
   // ============================================================
   // PLAYER SETTINGS / CONTROLS MENU
@@ -408,6 +468,9 @@
 
   const savedPlayerName=localStorage.getItem('labyrun.playerName')||'';
   $('#playerName').value=savedPlayerName;
+  if($('#hostModeSelect'))$('#hostModeSelect').innerHTML=(PRODUCT?.modes||[]).map(m=>`<option value="${m.id}">${m.icon} ${m.name}</option>`).join('');
+  if($('#hostWorldSelect'))$('#hostWorldSelect').innerHTML=(PRODUCT?.worlds||[]).map(w=>`<option value="${w.id}">${w.icon} ${w.name}</option>`).join('');
+  if($('#hostDifficultySelect'))$('#hostDifficultySelect').innerHTML=(PRODUCT?.difficulties||[]).map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
 
   function safeName(){
     const v=($('#playerName').value||'').trim().slice(0,18)||'Player';
@@ -489,16 +552,21 @@
     }).join('');
     const allReady=next.players.length>0 && next.players.every(p=>p.ready&&p.characterId);
     const isHost=next.hostId===MP.getMyId();
+    const roomWorld=PRODUCT?.worldForLevel?.(next.levelIndex||0)||worldDef('mall');
+    $('#hostGameSettings')?.classList.toggle('hidden',!isHost);
+    if($('#hostModeSelect')){$('#hostModeSelect').value=next.modeId||'classic';$('#hostModeSelect').disabled=!!next.gameActive||!!next.postgame;}
+    if($('#hostWorldSelect')){$('#hostWorldSelect').value=roomWorld.id;$('#hostWorldSelect').disabled=!!next.gameActive||!!next.postgame;}
+    if($('#hostDifficultySelect')){$('#hostDifficultySelect').value=next.difficultyId||'standard';$('#hostDifficultySelect').disabled=!!next.gameActive||!!next.postgame;}
     $('#readyBtn').disabled=!me?.characterId;
     $('#readyBtn').textContent=me?.ready?'NOT READY':'READY UP';
     $('#hostStartBtn').classList.toggle('hidden',!isHost);
     $('#hostStartBtn').disabled=!isHost||!allReady||next.gameActive;
-    const lobbyLevel=levelFor(next.levelIndex||0);
+    const lobbyLevel=levelFor(next.levelIndex||0),lobbyMode=modeDef(next.modeId||'classic');
     $('#lobbyNotice').textContent=next.gameActive
-      ? `Food Court ${(next.levelIndex||0)+1} is starting…`
+      ? `${lobbyMode.name} • ${roomWorld.name} is starting…`
       : allReady
-        ? (isHost?`Everyone is ready. START ${lobbyLevel.name}.`:`Everyone is ready. Waiting for the host to start ${lobbyLevel.name}.`)
-        : `NEXT: FOOD COURT ${(next.levelIndex||0)+1} — ${lobbyLevel.name}. Pick racers and ready up. Empty slots become AI.`;
+        ? (isHost?`Everyone is ready. START ${lobbyMode.name.toUpperCase()} in ${roomWorld.name}.`:`Everyone is ready. Waiting for the host to start ${lobbyMode.name} in ${roomWorld.name}.`)
+        : `${lobbyMode.icon} ${lobbyMode.name.toUpperCase()} • ${roomWorld.name} • ${lobbyLevel.name}. Pick racers and ready up. Empty slots become AI.`;
     const vs=VOICE?.getState?.()||{};
     $('#voiceSummary').textContent=vs.joined?(vs.muted?'Joined • mic muted':`Joined • ${Math.max(0,next.players.filter(p=>p.voiceEnabled).length-1)} friend(s) connected`):'Not joined';
     $('#joinVoiceBtn').classList.toggle('hidden',!!vs.joined);
@@ -536,6 +604,9 @@
   };
   $('#readyBtn').onclick=()=>{const me=roomState?.players.find(p=>p.id===MP.getMyId());MP.updatePlayer({ready:!me?.ready});};
   $('#hostStartBtn').onclick=async()=>{try{await MP.startGame();}catch(e){$('#lobbyNotice').textContent=e.message;}};
+  $('#hostModeSelect')?.addEventListener('change',async e=>{try{await MP.updateRoomSettings({modeId:e.target.value});}catch(err){$('#lobbyNotice').textContent=err.message;}});
+  $('#hostWorldSelect')?.addEventListener('change',async e=>{try{const w=worldDef(e.target.value);await MP.updateRoomSettings({levelIndex:w.startLevelIndex||0});}catch(err){$('#lobbyNotice').textContent=err.message;}});
+  $('#hostDifficultySelect')?.addEventListener('change',async e=>{try{await MP.updateRoomSettings({difficultyId:e.target.value});}catch(err){$('#lobbyNotice').textContent=err.message;}});
   $('#joinVoiceBtn').onclick=async()=>{
     try{ await VOICE.join(); renderRoom(roomState); }catch(e){ $('#lobbyNotice').textContent=`Voice: ${e.message}`; }
   };
@@ -668,6 +739,8 @@
       raceId:multiplayer.raceId,
       levelIndex:activeLevelIndex,
       levelName:activeLevel.name,
+      modeId:activeModeId,
+      difficultyId:activeDifficultyId,
       width:W,height:H,
       start:{x:start.x,y:start.y},
       exit:{x:exit.x,y:exit.y},
@@ -691,6 +764,8 @@
       throw new Error('Invalid synchronized maze data.');
     }
     W=width;H=height;
+    if(world.modeId)activeModeId=modeDef(world.modeId).id;
+    if(world.difficultyId)activeDifficultyId=difficultyDef(world.difficultyId).id;
     maze=rows.map(r=>Array.from(r,ch=>ch==='1'?1:0));
     start={x:Number(world.start?.x),y:Number(world.start?.y)};
     exit={x:Number(world.exit?.x),y:Number(world.exit?.y)};
@@ -850,10 +925,11 @@
     if(second.x===first.x&&second.y===first.y){
       second=source.reduce((best,c)=>Math.hypot(c.x-first.x,c.y-first.y)>Math.hypot(best.x-first.x,best.y-first.y)?c:best,source[0]||first);
     }
+    const count=Math.max(1,Math.min(2,Number(activeRules().toiletCount||CFG.race.toiletCount||2)));
     return [
       {id:'toilet-1',x:first.x,y:first.y,claimedBy:null},
       {id:'toilet-2',x:second.x,y:second.y,claimedBy:null}
-    ];
+    ].slice(0,count);
   }
 
   function openToilets(){ return toilets.filter(t=>!t.claimedBy); }
@@ -1003,14 +1079,14 @@
       isHuman:isLocal,isLocal,isRemoteHuman,isAI,personality,
       x:start.x+.5+o[0], y:start.y+.5+o[1], dir:0,
       bowel:rand(CFG.race.startingBowelMin,CFG.race.startingBowelMax),
-      pooped:false, won:false, finished:false, finishPlace:0, mapChecks:CFG.race.mapChecks+(c.stats.mapChecks||0), mapBoost:0,
+      pooped:false, won:false, finished:false, finishPlace:0, mapChecks:activeRules().mapDisabled?0:Number(activeRules().mapChecks??CFG.race.mapChecks)+(c.stats.mapChecks||0), mapBoost:0,
       stamina:maxStamina, maxStamina, sprinting:false, lastSprintAt:-99999,
       path:[], pathTick:0, wiggle:random()*10,
       aiSprintFor:0, aiSprintCooldown:rand(.2,1.2), seed:random()*100000,
       launchTarget:null, launchComplete:false, crisisReaction:0,
       gutPath:[], gutPathSet:new Set(), gutTargetToiletId:null, gutRouteDiscipline:.45,
       invincibleUntil:0, trapSlowUntil:0, specialActiveUntil:0, specialAnimUntil:0,
-      specialCharges:Number(c.special?.charges||0), specialRechargeAt:0,
+      specialCharges:Number(c.special?.charges||0)+Number(activeRules().specialExtraCharges||0), specialRechargeAt:0,
       roundScore:0, foodCollected:false,lastSpecialTrailAt:0,
       isMoving:false,
       netX:null,netY:null,netDir:null
@@ -1138,6 +1214,11 @@
     $('#introCaption').classList.remove('hidden');
     $('#panicFx').classList.remove('active','alarm');
     $('#crisisRisk').classList.add('hidden');
+    const world=activeWorld(),mode=activeMode();
+    if($('#gameWorldLabel'))$('#gameWorldLabel').textContent=`${world.icon||''} ${world.name||activeLevel.worldName||'WORLD'}`;
+    if($('#gameModeLabel'))$('#gameModeLabel').textContent=`${mode.icon||''} ${mode.name||'CLASSIC'}`;
+    $('#mapBtn')?.classList.toggle('mode-disabled',!!activeRules().mapDisabled);
+    $('#touchMapBtn')?.classList.toggle('mode-disabled',!!activeRules().mapDisabled);
     updateHud();
     renderVoiceHud();
     AUDIO.setMode('normal');
@@ -1146,12 +1227,17 @@
 
   function startGame(){
     multiplayer={active:false,isHost:false,myId:null,meta:null,raceId:null,worldReady:false,remoteInputs:new Map(),lastInputSend:0,lastSnapshotSend:0,ending:false};
+    activeModeId=modeDef(selectedModeId).id;activeDifficultyId=difficultyDef(selectedDifficultyId).id;
+    PROFILE?.recordPick?.(CHARS[selected ?? 0]?.id);
     $('#voiceHud').classList.add('hidden');
     prepareGame(freshSeed(),setupPlayers,soloLevelIndex);
   }
 
   function startMultiplayerGame(meta){
     clearRematchUi();
+    activeModeId=modeDef(meta.modeId||roomState?.modeId||'classic').id;
+    activeDifficultyId=difficultyDef(meta.difficultyId||roomState?.difficultyId||'standard').id;
+    const localCharId=roomState?.players?.find(p=>p.id===MP.getMyId())?.characterId; if(localCharId)PROFILE?.recordPick?.(localCharId);
     const delay=Number.isFinite(meta.startDelayMs)?meta.startDelayMs:Math.max(0,(meta.startAt||Date.now())-Date.now());
     multiplayer={
       active:true,isHost:meta.hostId===MP.getMyId(),myId:MP.getMyId(),meta,
@@ -1203,12 +1289,14 @@
     }
     raceStartedAt=now;
     const crisisTiming=Number(activeLevel.crisisTimeMultiplier||1);
-    crisisAt=now+rand(CFG.race.crisisMinMs*crisisTiming,CFG.race.crisisMaxMs*crisisTiming);
+    const rules=activeRules();
+    const minMs=Number(rules.crisisMinMs??CFG.race.crisisMinMs),maxMs=Number(rules.crisisMaxMs??CFG.race.crisisMaxMs);
+    crisisAt=now+rand(minMs*crisisTiming,maxMs*crisisTiming);
     $('#introCaption').classList.add('hidden');
     $('#countdown').classList.add('hidden');
     $('#preCrisis').classList.add('hidden');
     AUDIO.setMode('normal');
-    banner(`FOOD COURT ${activeLevelIndex+1}: ${activeLevel.name} — GO! FIND THE EXIT.`,1900);
+    banner(`${activeMode().icon||'🚽'} ${activeMode().name.toUpperCase()} • ${activeWorld().name.toUpperCase()} • GO! FIND THE EXIT.`,2100);
   }
 
   $('#startSoloBtn').onclick=startGame;
@@ -1226,8 +1314,13 @@
         $('#rematchStatus').textContent=e.message||String(e);
       }
     } else {
-      soloLevelIndex=Math.min(soloLevelIndex+1,levelCount()-1);
-      startGame();
+      if(activeLevelIndex>=levelCount()-1){
+        soloLevelIndex=0;soloScoreTotals.clear();soloRosterCharacterIds=null;soloRosterSeed=0;
+        renderPlaySetup();show('#playSetupScreen');
+      }else{
+        soloLevelIndex=Math.min(soloLevelIndex+1,levelCount()-1);
+        startGame();
+      }
     }
   };
   $('#menuBtn').onclick=async()=>{
@@ -1327,6 +1420,7 @@
 
   function toggleMap(){
     if(phase!=='race' && phase!=='crisis') return;
+    if(activeRules().mapDisabled){banner('🙈 NO MAP MODE. YOU HAD ONE LOOK. LIVE WITH IT.',1600);return;}
     const p=localPlayer();
     if(!p)return;
     if(mapOpen){
@@ -1345,6 +1439,7 @@
     } else {
       consumeMapPeek(p);
     }
+    if(p.isLocal)PROFILE?.recordMapPeek?.();
     mapOpen=true;
     $('#mapOverlay').classList.remove('hidden');
     requestAnimationFrame(drawMap);
@@ -1367,7 +1462,7 @@
     const spec=p?.char?.special;
     if(!spec)return;
     if(p.specialCharges<=0 && p.specialRechargeAt>0 && now>=p.specialRechargeAt){
-      p.specialCharges=Number(spec.charges||1);
+      p.specialCharges=Number(spec.charges||1)+Number(activeRules().specialExtraCharges||0);
       p.specialRechargeAt=0;
       if(p.isLocal) banner(`✨ ${spec.name} RECHARGED.`,1200);
     }
@@ -1376,7 +1471,7 @@
   function consumeSpecialCharge(p,now){
     const spec=p.char.special;if(!spec)return;
     p.specialCharges=Math.max(0,(p.specialCharges||0)-1);
-    if(p.specialCharges<=0)p.specialRechargeAt=now+Number(spec.cooldownMs||20000);
+    if(p.specialCharges<=0)p.specialRechargeAt=now+Number(spec.cooldownMs||20000)*Number(activeRules().specialCooldownScale||1);
   }
 
   function requestUseSpecial(){
@@ -1451,6 +1546,7 @@
 
     if(!success)return false;
     p.specialAnimUntil=now+760;
+    if(p.isLocal)PROFILE?.recordSpecialUse?.();
     AUDIO.specialSting?.();
     consumeSpecialCharge(p,now);
     if(multiplayer.active&&multiplayer.isHost){
@@ -1552,7 +1648,7 @@
   }
 
   function speedFor(p){
-    let base=CFG.movement.baseSpeed*(p.char.stats.speed||1)*(p.personality?.speed||1);
+    let base=CFG.movement.baseSpeed*(p.char.stats.speed||1)*(p.personality?.speed||1)*(p.isAI?Number(activeDifficulty().aiScale||1):1);
     // Once the alarm hits everybody instinctively hunches over and clutches their gut.
     // Sprint can temporarily fight this penalty, but adds bowel risk.
     if(phase==='crisis') base*=CFG.movement.crisisMovementMultiplier||0.76;
@@ -1580,7 +1676,7 @@
       if(!cleanBoost)p.stamina=Math.max(0,p.stamina-CFG.movement.staminaDrainPerSecond*dt);
       p.lastSprintAt=now;
       if(phase==='crisis'&&!cleanBoost&&now>=(p.invincibleUntil||0)){
-        p.bowel=Math.min(100,p.bowel+CFG.movement.crisisSprintBowelRiskPerSecond*dt*(p.char.stats.bowelRate||1));
+        p.bowel=Math.min(100,p.bowel+CFG.movement.crisisSprintBowelRiskPerSecond*Number(activeRules().crisisSprintRiskScale||1)*dt*(p.char.stats.bowelRate||1));
       }
     } else if(now-p.lastSprintAt>CFG.movement.staminaRegenDelayMs){
       p.stamina=Math.min(p.maxStamina,p.stamina+CFG.movement.staminaRegenPerSecond*dt);
@@ -1875,7 +1971,7 @@
     }
     if(evt.type==='wallBreak'&&maze[evt.y]?.[evt.x]===1){maze[evt.y][evt.x]=0;openCellCache.push({x:Number(evt.x),y:Number(evt.y)});}
     if(evt.type==='specialUsed'){
-      const p=players.find(x=>x.id===evt.playerId);if(p){const eventNow=performance.now();p.specialCharges=Number(evt.charges??p.specialCharges);p.specialRechargeAt=Number(evt.rechargeRemainingMs)>0?eventNow+Number(evt.rechargeRemainingMs):0;p.specialActiveUntil=Number(evt.activeRemainingMs)>0?eventNow+Number(evt.activeRemainingMs):0;p.specialAnimUntil=eventNow+760;}
+      const p=players.find(x=>x.id===evt.playerId);if(p){const eventNow=performance.now();p.specialCharges=Number(evt.charges??p.specialCharges);p.specialRechargeAt=Number(evt.rechargeRemainingMs)>0?eventNow+Number(evt.rechargeRemainingMs):0;p.specialActiveUntil=Number(evt.activeRemainingMs)>0?eventNow+Number(evt.activeRemainingMs):0;p.specialAnimUntil=eventNow+760;if(p.isLocal)PROFILE?.recordSpecialUse?.();}
       if(Array.isArray(evt.traps))traps=evt.traps.map(t=>({...t}));
       AUDIO.specialSting?.();
     }
@@ -1974,7 +2070,7 @@
     if(phase!=='race' && !fromNetwork)return;
     phase='crisis';
     $('#preCrisis').classList.add('hidden');
-    $('#objectiveText').textContent='🚽 2 TOILETS';
+    $('#objectiveText').textContent=`🚽 ${toilets.length} TOILET${toilets.length===1?'':'S'}`;
     $('#crisisRisk').classList.remove('hidden');
     $('#panicFx').classList.add('active','alarm');
     $('#gameScreen').classList.add('bowel-rumble');
@@ -1994,7 +2090,7 @@
 
     if(!fromNetwork){
       players.forEach(p=>{
-        const crisisBonus=Number(activeLevel.crisisStartBonus||0);
+        const crisisBonus=Number(activeLevel.crisisStartBonus||0)+Number(activeRules().crisisStartBonus||0);
         p.bowel=Math.max(p.bowel,Math.min(92,rand(CFG.race.crisisBowelMin+crisisBonus,CFG.race.crisisBowelMax+crisisBonus)));
         p.path=[];
         p.pathTick=0;
@@ -2009,7 +2105,7 @@
 
     AUDIO.panicSting();
     AUDIO.setMode('panic');
-    banner('🚨 BOWEL EVENT! EXIT CANCELLED. TWO TOILETS. FOUR DESPERATE PEOPLE. 🚨',4400,true);
+    banner(`🚨 BOWEL EVENT! EXIT CANCELLED. ${toilets.length===1?'ONE THRONE. ONE SURVIVOR.':'TWO TOILETS. FOUR DESPERATE PEOPLE.'} 🚨`,4400,true);
     updateToiletRadar();
   }
 
@@ -2107,10 +2203,19 @@
       rows.forEach(row=>soloScoreTotals.set(row.id,(soloScoreTotals.get(row.id)||0)+row.roundScore));
     }
 
+    const me=localPlayer();
+    const localWon=!!me&&winners.some(w=>w.id===me.id);
+    const careerResult=PROFILE?.recordRace?.({
+      modeId:activeModeId,difficultyId:activeDifficultyId,worldId:activeWorld().id,
+      won:localWon,escaped:localWon&&!toiletWin,toiletSurvived:localWon&&!!toiletWin,
+      pooped:!!me?.pooped,foodCollected:!!me?.foodCollected,score:Number(me?.roundScore||0),
+      allPooped:!winners.length
+    })||null;
+
     setTimeout(()=>{
       show('#resultScreen');
       drawResult();
-      $('#resultKicker').textContent=`FOOD COURT ${activeLevelIndex+1}/${levelCount()} • ${activeLevel.name}`;
+      $('#resultKicker').textContent=`${activeWorld().icon||''} ${activeWorld().name} • ${activeMode().name} • COURT ${activeLevel.worldCourt||activeLevelIndex+1}/${activeLevel.worldCourtCount||levelCount()}`;
       const winnerArt=$('#resultWinnerArt'),winnerImg=$('#resultWinnerImage'),winnerImg2=$('#resultWinnerImage2');
       const winnerGhostA=$('#resultWinnerGhostA'),winnerGhostB=$('#resultWinnerGhostB');
       const w1=winners[0]||null,w2=winners[1]||null;
@@ -2147,12 +2252,21 @@
           $('#resultText').textContent=`${w1.name} claimed one throne. ${w2.name} claimed the other. The remaining racers experienced an immediate catastrophic loss of dignity.`;
         }else{
           $('#resultTitle').textContent=w1.isLocal?'YOU SURVIVED ALONE!':`${w1.name.toUpperCase()} SURVIVES`;
-          $('#resultText').textContent=`${w1.name} found porcelain safety. Everyone else failed before the second throne could be claimed.`;
+          $('#resultText').textContent=toilets.length===1
+            ? `${w1.name} claimed the only throne. Everyone else is now somebody else's cleaning problem.`
+            : `${w1.name} found porcelain safety. Everyone else failed before the second throne could be claimed.`;
         }
       }else{
         $('#resultTitle').textContent=w1.isLocal?'YOU ESCAPED!':`${w1.name.toUpperCase()} WINS`;
         $('#resultText').textContent=`${w1.name} escaped before the bowel emergency escalated. An unusually clean outcome.`;
       }
+
+      const reward=$('#careerReward');
+      if(reward&&careerResult){
+        const unlocks=(careerResult.unlocks||[]).map(id=>(PRODUCT?.achievements||[]).find(a=>a.id===id)).filter(Boolean);
+        reward.classList.remove('hidden');
+        reward.innerHTML=`<div class="career-reward-xp"><span>CAREER XP</span><b>+${careerResult.xp}</b><small>LEVEL ${careerResult.progress.level}</small></div><div class="career-reward-bar"><i style="width:${Math.min(100,(careerResult.progress.current/careerResult.progress.needed)*100)}%"></i></div>${unlocks.length?`<div class="career-unlocks">${unlocks.map(a=>`<span>${a.icon} ACHIEVEMENT: <b>${a.name}</b></span>`).join('')}</div>`:''}`;
+      }else reward?.classList.add('hidden');
 
       if(multiplayer.active){
         $('#resultLevel').textContent=`COMPLETED FOOD COURT ${activeLevelIndex+1} • ${activeLevel.name}`;
@@ -2169,10 +2283,11 @@
         $('#rematchCountdown').classList.add('hidden');
         renderScoreboard(rows.map(r=>({...r,totalScore:soloScoreTotals.get(r.id)||r.roundScore})));
         const nextIndex=Math.min(activeLevelIndex+1,levelCount()-1),next=levelFor(nextIndex);
+        const nextWorld=PRODUCT?.worldForLevel?.(nextIndex);
         $('#resultLevel').textContent=activeLevelIndex<levelCount()-1
-          ? `NEXT: FOOD COURT ${nextIndex+1} • ${next.name}`
-          : `FINAL FOOD COURT • ${activeLevel.name} • RELIEF PICKUPS ACTIVE`;
-        $('#againBtn').textContent=activeLevelIndex<levelCount()-1?'Next Food Court':'Race Again';
+          ? `NEXT: ${nextWorld?.name||'WORLD'} • COURT ${next.worldCourt||nextIndex+1} • ${next.name}`
+          : `FINAL COURT • ${activeLevel.name} • CAMPAIGN COMPLETE`;
+        $('#againBtn').textContent=activeLevelIndex<levelCount()-1?'Next Food Court':'New Run';
       }
     },500);
   }
@@ -2208,7 +2323,7 @@
       const tpShield=p.char.special?.id==='tpShield'&&now<(p.specialActiveUntil||0);
       if(!p.pooped&&!p.won&&!p.finished&&!invincible&&!tpShield){
         const baseRise=phase==='crisis'?CFG.race.baseBowelRiseCrisis:CFG.race.baseBowelRiseNormal;
-        const levelBowel=Number(activeLevel.bowelMultiplier||1);
+        const levelBowel=Number(activeLevel.bowelMultiplier||1)*Number(activeRules().bowelMultiplier||1)*Number(activeDifficulty().bowelScale||1);
         const routeMultiplier=phase==='crisis'?updateGutRouteDiscipline(p,dt):1;
         p.bowel=Math.min(100,p.bowel+baseRise*levelBowel*routeMultiplier*(p.char.stats.bowelRate||1)*dt);
       }
@@ -2332,7 +2447,9 @@
   // through a broad palette while the floors stay dark enough for racers/HUD
   // to remain readable. No server sync is required because level index is shared.
   function courtPalette(index=activeLevelIndex){
-    const hue=(326 + (Number(index)||0)*47) % 360;
+    const world=PRODUCT?.worldForLevel?.(Number(index)||0);
+    const local=world?Math.max(0,(Number(index)||0)-world.startLevelIndex):(Number(index)||0);
+    const hue=(Number(world?.hue??326) + local*17) % 360;
     const hue2=(hue+18)%360;
     return {
       wallTop:`hsl(${hue} 31% 28%)`,
@@ -2439,6 +2556,55 @@
     ctx.restore();
   }
 
+  function dressingHash(x,y,salt=0){
+    let h=(Math.imul((x+1)|0,73856093)^Math.imul((y+1)|0,19349663)^Math.imul((activeLevelIndex+1+salt)|0,83492791))>>>0;
+    h^=h>>>13;h=Math.imul(h,1274126177)>>>0;h^=h>>>16;return h>>>0;
+  }
+
+  function wallNeighbours(x,y){
+    const out=[];
+    if(y>0&&maze[y-1]?.[x]===1)out.push({dx:0,dy:-1});
+    if(x<W-1&&maze[y]?.[x+1]===1)out.push({dx:1,dy:0});
+    if(y<H-1&&maze[y+1]?.[x]===1)out.push({dx:0,dy:1});
+    if(x>0&&maze[y]?.[x-1]===1)out.push({dx:-1,dy:0});
+    return out;
+  }
+
+  function drawWorldDressing(x,y,scale,tileProjection){
+    const world=activeWorld(),props=world?.props||[];
+    if(!props.length||scale<=.48)return;
+    const walls=wallNeighbours(x,y);
+    if(!walls.length)return; // decorative clutter belongs at the edges, never in an open lane
+
+    const h=dressingHash(x,y,3);
+    const zone=dressingHash(Math.floor(x/5),Math.floor(y/5),19)%100;
+    const clustered=zone<24;
+    const wallCount=walls.length;
+    const threshold=wallCount>=3?30:(wallCount===2?19:8);
+    const chance=clustered?Math.min(38,Math.round(threshold*1.55)):threshold;
+    if((h%100)>=chance)return;
+
+    // Pick one neighbouring wall and push the art almost onto that wall/floor seam.
+    // It reads as set dressing rather than something placed in the runnable center line.
+    const wall=walls[(h>>>8)%walls.length];
+    const jitter=((dressingHash(x,y,41)%1000)/999)-.5;
+    const alongX=wall.dy!==0?jitter*.24:0;
+    const alongY=wall.dx!==0?jitter*.24:0;
+    const wx=x+.5+wall.dx*.43+alongX;
+    const wy=y+.5+wall.dy*.43+alongY;
+    const pos=project(wx,wy,0,0,scale);
+    const center=project(x+.5,y+.5,0,0,scale);
+    const ox=pos.x-center.x,oy=pos.y-center.y;
+    const prop=props[(h>>>16)%props.length];
+
+    ctx.save();
+    ctx.globalAlpha*=clustered?.34:.27;
+    ctx.font=`${Math.max(7,10.5*scale)}px system-ui`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(prop,tileProjection.x+ox,tileProjection.y+oy-tileProjection.th*.17);
+    ctx.restore();
+  }
+
   function drawIso(now,camx,camy,scale,intro=false,alpha=1,viewPlayer=null){
     const p=viewPlayer||localPlayer();
     const palette=courtPalette();
@@ -2461,6 +2627,7 @@
       if(fog)continue;
       if(maze[y][x]===0){
         ctx.fillStyle=((x+y)&1)?palette.floorA:palette.floorB;diamond(ctx,pr.x,pr.y,pr.tw,pr.th);
+        drawWorldDressing(x,y,scale,pr);
       } else {
         // During bowel mode the structure itself looks unstable. This is
         // cosmetic only: collision walls do not actually move.
@@ -2760,7 +2927,7 @@
       // camera angle used during the race.
       if(elapsed<exitHold){
         drawIso(now,exit.x+.5,exit.y+.5,exitCloseScale,true,1);
-        $('#introCaption').textContent="THERE'S THE EXIT — REMEMBER WHERE IT IS.";
+        $('#introCaption').textContent=`${activeWorld().icon||''} ${activeWorld().name.toUpperCase()} • THERE'S THE EXIT.`;
         return;
       }
 
@@ -2823,30 +2990,44 @@
       leaveSpectatorMode();
     }
 
-    // Bowel-event reveal: show BOTH one-use toilets before returning to the
-    // racer. Afterward the radar always points to the nearest unclaimed throne.
+    // Bowel-event reveal: sweep across every available throne before returning
+    // to the racer. One Throne mode gets a shorter one-stop cinematic.
     let camx=p.x,camy=p.y;
     if(phase==='crisis' && toiletRevealActive){
       const fly=CFG.camera.toiletRevealFlyMs||1050;
       const hold=CFG.camera.toiletRevealHoldMs||1150;
       const back=CFG.camera.toiletRevealReturnMs||1050;
       const a=toiletRevealTargets[0]||toilets[0]||toilet;
-      const b=toiletRevealTargets[1]||toilets[1]||a;
+      const b=toiletRevealTargets[1]||toilets[1]||null;
       const elapsed=now-toiletRevealStart;
-      const total=fly+hold+fly+hold+back;
-      if(elapsed<fly){
-        const t=ease(elapsed/fly);camx=lerp(toiletRevealFrom.x,a.x+.5,t);camy=lerp(toiletRevealFrom.y,a.y+.5,t);
-      }else if(elapsed<fly+hold){
-        camx=a.x+.5;camy=a.y+.5;
-      }else if(elapsed<fly+hold+fly){
-        const t=ease((elapsed-fly-hold)/fly);camx=lerp(a.x+.5,b.x+.5,t);camy=lerp(a.y+.5,b.y+.5,t);
-      }else if(elapsed<fly+hold+fly+hold){
-        camx=b.x+.5;camy=b.y+.5;
-      }else if(elapsed<total){
-        const t=ease((elapsed-(fly+hold+fly+hold))/back);camx=lerp(b.x+.5,p.x,t);camy=lerp(b.y+.5,p.y,t);
+      if(!b){
+        const total=fly+hold+back;
+        if(elapsed<fly){
+          const t=ease(elapsed/fly);camx=lerp(toiletRevealFrom.x,a.x+.5,t);camy=lerp(toiletRevealFrom.y,a.y+.5,t);
+        }else if(elapsed<fly+hold){
+          camx=a.x+.5;camy=a.y+.5;
+        }else if(elapsed<total){
+          const t=ease((elapsed-fly-hold)/back);camx=lerp(a.x+.5,p.x,t);camy=lerp(a.y+.5,p.y,t);
+        }else{
+          toiletRevealActive=false;$('#toiletRadar').classList.remove('reveal');
+          banner('🚽 THE ONLY THRONE IS LOCATED. MOVE.',2800,true);updateToiletRadar();
+        }
       }else{
-        toiletRevealActive=false;$('#toiletRadar').classList.remove('reveal');
-        banner('🚽 TWO TOILETS LOCATED. RADAR TRACKS THE NEAREST OPEN ONE.',2800,true);updateToiletRadar();
+        const total=fly+hold+fly+hold+back;
+        if(elapsed<fly){
+          const t=ease(elapsed/fly);camx=lerp(toiletRevealFrom.x,a.x+.5,t);camy=lerp(toiletRevealFrom.y,a.y+.5,t);
+        }else if(elapsed<fly+hold){
+          camx=a.x+.5;camy=a.y+.5;
+        }else if(elapsed<fly+hold+fly){
+          const t=ease((elapsed-fly-hold)/fly);camx=lerp(a.x+.5,b.x+.5,t);camy=lerp(a.y+.5,b.y+.5,t);
+        }else if(elapsed<fly+hold+fly+hold){
+          camx=b.x+.5;camy=b.y+.5;
+        }else if(elapsed<total){
+          const t=ease((elapsed-(fly+hold+fly+hold))/back);camx=lerp(b.x+.5,p.x,t);camy=lerp(b.y+.5,p.y,t);
+        }else{
+          toiletRevealActive=false;$('#toiletRadar').classList.remove('reveal');
+          banner('🚽 TWO TOILETS LOCATED. RADAR TRACKS THE NEAREST OPEN ONE.',2800,true);updateToiletRadar();
+        }
       }
     }
 

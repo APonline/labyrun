@@ -9,6 +9,7 @@
 // fast as v3.2. The old 225x225 monster now arrives around the middle of the
 // ladder, while Food Court 50 reaches 379x379. Dimensions stay odd so the
 // maze carver keeps clean one-cell walls/corridors.
+const LABYRUN_PRODUCT = window.LABYRUN_PRODUCT || {worlds:[],worldForLevel:()=>null};
 const LABYRUN_LEVEL_COUNT = 50;
 const LABYRUN_MIN_COURT = 71;
 const LABYRUN_MAX_COURT = 379;
@@ -38,14 +39,12 @@ function labyrunCourtSize(index){
 }
 
 function labyrunCourtName(index){
+  const world=LABYRUN_PRODUCT.worldForLevel?.(index);
+  const local=world?index-world.startLevelIndex: index;
   if(index===0) return 'THE STARTER COURT';
-  if(index===LABYRUN_LEVEL_COUNT-1) return 'THE MEGA FOOD COURT';
-  const i=index-1;
-  // Deterministic but scrambled-looking pairings: every player sees the same
-  // silly court name without the server having to ship a name table.
-  const p=i%LABYRUN_COURT_PREFIXES.length;
-  const band=Math.floor(i/LABYRUN_COURT_PREFIXES.length);
-  const v=(p*7 + band*3) % LABYRUN_COURT_VENUES.length;
+  if(index===LABYRUN_LEVEL_COUNT-1) return 'THE FINAL EXPO';
+  const p=(local + (world?.index||0)*2)%LABYRUN_COURT_PREFIXES.length;
+  const v=(local*7 + (world?.index||0)*3) % LABYRUN_COURT_VENUES.length;
   return `${LABYRUN_COURT_PREFIXES[p]} ${LABYRUN_COURT_VENUES[v]}`;
 }
 
@@ -53,14 +52,22 @@ const LABYRUN_LEVELS = Array.from({length:LABYRUN_LEVEL_COUNT},(_,index)=>{
   const size=labyrunCourtSize(index);
   const progress=index/(LABYRUN_LEVEL_COUNT-1);
   const reliefProgress=Math.max(0,(size-LABYRUN_RELIEF_START_COURT)/(LABYRUN_MAX_COURT-LABYRUN_RELIEF_START_COURT));
+  const world=LABYRUN_PRODUCT.worldForLevel?.(index)||null;
   return {
     id:`food-court-${index+1}`,
     name:labyrunCourtName(index),
+    worldId:world?.id||'mall',
+    worldName:world?.name||'Mall Food Court',
+    worldIcon:world?.icon||'🛍️',
+    worldHue:Number(world?.hue??326),
+    worldIndex:Number(world?.index||0),
+    worldCourt:index-Number(world?.startLevelIndex||0)+1,
+    worldCourtCount:Number(world?.courts||LABYRUN_LEVEL_COUNT),
     subtitle:index===0
       ? 'A polite little warning from your digestive system.'
-      : size>=LABYRUN_RELIEF_START_COURT
+      : world?.tagline || (size>=LABYRUN_RELIEF_START_COURT
         ? 'The courts are enormous now. Pharmaceutical intervention authorized.'
-        : 'One more bad decision deeper into the food court.',
+        : 'One more bad decision deeper into the food court.'),
     width:size,
     height:size,
 
