@@ -1,6 +1,6 @@
 {
   "name": "labyrun-bathroom-emergency",
-  "version": "0.3.0",
+  "version": "0.3.3",
   "private": true,
   "scripts": {
     "start": "node server.js"

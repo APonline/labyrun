@@ -89,11 +89,13 @@
       socket.on('room:error', message => emit('room:error', message));
       socket.on('room:notice', message => emit('room:notice', message));
       socket.on('game:start', meta => emit('game:start', meta));
+      socket.on('game:world', payload => emit('game:world', payload));
       socket.on('game:input', payload => emit('game:input', payload));
       socket.on('game:action', payload => emit('game:action', payload));
       socket.on('game:snapshot', payload => emit('game:snapshot', payload));
       socket.on('game:event', payload => emit('game:event', payload));
       socket.on('game:end', payload => emit('game:end', payload));
+      socket.on('game:postgame', payload => emit('game:postgame', payload));
       socket.on('voice:offer', payload => emit('voice:offer', payload));
       socket.on('voice:answer', payload => emit('voice:answer', payload));
       socket.on('voice:candidate', payload => emit('voice:candidate', payload));
@@ -130,6 +132,8 @@
     leaveRoom: () => request('room:leave',{}),
     updatePlayer: patch => send('player:update',patch),
     startGame: () => request('game:start',{}),
+    requestRematch: () => request('game:rematch',{}),
+    sendWorld: payload => { if(socket?.connected) socket.emit('game:world',payload); },
     sendInput: payload => { if(socket?.connected) socket.emit('game:input',payload); },
     sendAction: payload => { if(socket?.connected) socket.emit('game:action',payload); },
     sendSnapshot: payload => { if(socket?.connected) socket.emit('game:snapshot',payload); },

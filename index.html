@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>LABYRUN: Bathroom Emergency</title>
+  <link rel="stylesheet" href="src/styles/game.css?v=3.13-iso-voice" />
+</head>
+<body>
+  <div id="app">
+    <section id="bootScreen" class="screen active boot-screen">
+      <button id="enterBtn" class="boot-turd" aria-label="Click to enter LABYRUN">
+        <span class="boot-poop" aria-hidden="true">💩</span>
+        <span class="boot-click">CLICK ME</span>
+        <small>totally safe</small>
+      </button>
+    </section>
+
+    <section id="menuScreen" class="screen">
+      <div class="menu-card">
+        <img class="menu-logo" src="assets/ui/labyrun-logo.png" alt="LABYRUN" />
+        <div class="eyebrow menu-eyebrow">A completely dignified maze experience</div>
+        <p class="tagline">You came for tacos. You stayed because there are only two toilets.</p>
+        <div class="menu-actions">
+          <button id="soloBtn" class="primary">Solo vs 3 AI</button>
+          <button id="multiBtn">Multiplayer Room</button>
+          <button id="settingsBtn">Settings</button>
+          <button id="controlsBtn">Controls</button>
+          <button id="howBtn">How It Works</button>
+        </div>
+        <div class="tiny">Keyboard + gamepad + touch supported • tune the chaos in Settings</div>
+      </div>
+      <div class="food-stand taco">🌮<span>TACO STAND</span></div>
+      <div class="food-stand curry">🍛<span>CURRY STAND</span></div>
+    </section>
+
+
+    <section id="settingsScreen" class="screen">
+      <div class="panel settings-panel">
+        <div class="row-between settings-heading">
+          <div><div class="eyebrow">Tune your intestinal apocalypse</div><h2>Settings</h2></div>
+          <button class="backBtn top-back">Back</button>
+        </div>
+        <div class="settings-grid">
+          <label class="setting-card">
+            <div class="setting-copy"><b>Music Volume</b><span>Menu theme, normal maze groove and bowel-panic soundtrack.</span></div>
+            <div class="setting-control"><input id="musicVolumeSetting" type="range" min="0" max="100" step="5"><output id="musicVolumeValue">65%</output></div>
+          </label>
+          <label class="setting-card">
+            <div class="setting-copy"><b>Sound Effects</b><span>Belches, farts, alarm, flush and catastrophic failure.</span></div>
+            <div class="setting-control"><input id="sfxVolumeSetting" type="range" min="0" max="100" step="5"><output id="sfxVolumeValue">70%</output></div>
+          </label>
+          <label class="setting-card">
+            <div class="setting-copy"><b>Bowel-World Rumble</b><span>How hard the camera and maze walls shake after the alarm.</span></div>
+            <div class="setting-control"><input id="rumbleSetting" type="range" min="0" max="100" step="5"><output id="rumbleValue">55%</output></div>
+          </label>
+          <label class="setting-card">
+            <div class="setting-copy"><b>Red Alarm Flash</b><span>Intensity of the pulsing bowel-emergency glow.</span></div>
+            <div class="setting-control"><input id="alarmFlashSetting" type="range" min="0" max="100" step="5"><output id="alarmFlashValue">80%</output></div>
+          </label>
+          <label class="setting-card">
+            <div class="setting-copy"><b>View Distance</b><span>How far the fog of war lets you see around your racer.</span></div>
+            <div class="setting-control"><input id="viewDistanceSetting" type="range" min="75" max="135" step="5"><output id="viewDistanceValue">100%</output></div>
+          </label>
+          <label class="setting-card setting-toggle-card">
+            <div class="setting-copy"><b>Gameplay Control Hint</b><span>Keep the current keyboard/gamepad controls visible at the top.</span></div>
+            <input id="controlHintsSetting" class="toggle-input" type="checkbox">
+          </label>
+        </div>
+        <div class="settings-footer">
+          <span>Changes save automatically in this browser.</span>
+          <button id="resetSettingsBtn">Reset Defaults</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="controlsScreen" class="screen">
+      <div class="panel controls-panel">
+        <div class="row-between settings-heading">
+          <div><div class="eyebrow">Know what to mash before disaster</div><h2>Controls</h2></div>
+          <button class="backBtn top-back">Back</button>
+        </div>
+        <div class="control-tabs">
+          <button id="keyboardTabBtn" class="control-tab active">Keyboard</button>
+          <button id="gamepadTabBtn" class="control-tab">Gamepad</button>
+          <button id="touchTabBtn" class="control-tab">Touch</button>
+        </div>
+        <div id="keyboardControls" class="control-layout">
+          <div class="control-hero">
+            <div class="key-cluster"><span class="keycap">W</span><div><span class="keycap">A</span><span class="keycap">S</span><span class="keycap">D</span></div></div>
+            <div><b>Move</b><span>WASD or arrow keys</span></div>
+          </div>
+          <div class="control-row"><span class="keycap wide">SHIFT</span><div><b>Sprint</b><span>Hold it. In bowel mode, speed costs gut safety.</span></div></div>
+          <div class="control-row"><span class="keycap">M</span><div><b>Map Peek</b><span>Five uses. Every peek annoys your stomach.</span></div></div>
+          <div class="control-row"><span class="keycap">E</span><div><b>Special</b><span>Use your character's active special when they have one.</span></div></div>
+        </div>
+        <div id="gamepadControls" class="control-layout hidden">
+          <div id="gamepadStatus" class="gamepad-status">No gamepad detected yet. Connect one and press a button.</div>
+          <div class="control-row"><span class="pad-glyph">◉</span><div><b>Move</b><span>Left stick or D-pad</span></div></div>
+          <div class="control-row"><span class="pad-glyph trigger">RT<br><small>R2</small></span><div><b>Sprint</b><span>Hold RT/R2. A/Cross also works.</span></div></div>
+          <div class="control-row"><span class="pad-glyph face">Y<br><small>△</small></span><div><b>Map Peek</b><span>Y / Triangle</span></div></div>
+          <div class="control-row"><span class="pad-glyph face">X<br><small>□</small></span><div><b>Special</b><span>X / Square</span></div></div>
+        </div>
+        <div id="touchControlsHelp" class="control-layout hidden">
+          <div class="control-hero touch-control-hero"><span class="touch-help-stick"><i></i></span><div><b>Move</b><span>Touch and drag anywhere on the left side. The joystick appears under your thumb.</span></div></div>
+          <div class="control-row"><span class="touch-help-button sprint">SPRINT</span><div><b>Sprint</b><span>Hold the right-thumb SPRINT button. In bowel mode this also raises poop pressure.</span></div></div>
+          <div class="control-row"><span class="touch-help-button map">MAP</span><div><b>Map Peek</b><span>Tap MAP above the sprint button. You still only get five peeks.</span></div></div>
+          <div class="control-row"><span class="touch-help-button special">SPECIAL</span><div><b>Special</b><span>Tap the purple SPECIAL button when your racer has an active ability.</span></div></div>
+        </div>
+        <div class="controls-note">The in-game control strip automatically changes to whichever input you used most recently.</div>
+      </div>
+    </section>
+
+    <section id="howScreen" class="screen">
+      <div class="panel narrow">
+        <h2>How this disaster works</h2>
+        <ul>
+          <li>Four racers begin at the food stand and race toward the maze exit.</li>
+          <li>You get a bird's-eye look at the full labyrinth before the camera dives down into the maze.</li>
+          <li>Shift uses stamina for a normal sprint. During a bowel emergency, sprinting also raises your poop risk.</li>
+          <li>When the bowel alarm hits, the EXIT stops mattering. Two one-use toilets become the only safe havens.</li>
+          <li>You may open the full map only <b>5 times</b>. Every peek adds bowel pressure.</li>
+          <li>The closer you are to disaster, the slower and more ridiculous your walk becomes.</li>
+          <li>The first two racers to claim the two toilets survive. The other two immediately lose control of the situation.</li>
+        </ul>
+        <button class="backBtn">Back</button>
+      </div>
+    </section>
+
+    <section id="characterScreen" class="screen">
+      <div class="panel character-panel">
+        <div class="row-between">
+          <div><div class="eyebrow">Choose your doomed champion</div><h2>Character Select</h2></div>
+          <button class="backBtn">Back</button>
+        </div>
+        <div id="characterGrid" class="character-grid"></div>
+        <div id="selectedProfile" class="selected-profile">
+          <div class="selected-profile-empty">Hover to hear a belch. Pick someone with questionable judgment.</div>
+        </div>
+        <div class="row-between footer-row">
+          <div class="selected-blurb">Four simple ratings: RUN, SPRINT, GUT and STAMINA. Weird bonuses live in each character's trait.</div>
+          <button id="startSoloBtn" class="primary" disabled>Enter the Labyrinth</button>
+        </div>
+      </div>
+      <div id="mobileCharacterCta" class="mobile-character-cta">
+        <div class="mobile-character-choice"><span>SELECTED RACER</span><b id="mobileSelectedName">Pick somebody</b><small id="mobileSelectedTrait">Tap a card to compare stats</small></div>
+        <button id="mobileStartSoloBtn" class="primary" disabled>PLAY</button>
+      </div>
+    </section>
+
+    <section id="roomScreen" class="screen">
+      <div class="panel multiplayer-panel">
+        <div class="row-between multiplayer-heading">
+          <div><div class="eyebrow">Four friends. Two toilets. Still terrible odds.</div><h2>Multiplayer Room</h2></div>
+          <button class="backBtn top-back">Back</button>
+        </div>
+
+        <div id="roomJoinView" class="room-join-view">
+          <div class="room-name-row">
+            <label><span>YOUR NAME</span><input id="playerName" maxlength="18" placeholder="PLAYER" autocomplete="nickname"></label>
+            <label><span>ROOM CODE</span><input id="roomCode" maxlength="8" placeholder="TURD69" autocomplete="off" autocapitalize="characters"></label>
+          </div>
+          <div class="room-join-actions">
+            <button id="createRoomBtn" class="primary">Create Room</button>
+            <button id="joinRoomBtn">Join Room</button>
+          </div>
+          <div id="roomStatus" class="status-box">Ready to create or join a room.</div>
+        </div>
+
+        <div id="roomLobbyView" class="room-lobby-view hidden">
+          <div class="lobby-topline">
+            <div class="room-code-card"><span>ROOM CODE</span><b id="activeRoomCode">------</b><button id="copyRoomCodeBtn">COPY</button></div>
+            <div class="lobby-voice-card">
+              <div><span>VOICE CHANNEL</span><b id="voiceSummary">Not joined</b></div>
+              <button id="joinVoiceBtn" class="primary small-primary">🎙 Join Voice</button>
+              <button id="muteVoiceBtn" class="hidden">Mute Mic</button>
+              <button id="deafenVoiceBtn" class="hidden">Mute Friends</button>
+            </div>
+          </div>
+
+          <div class="lobby-columns">
+            <div>
+              <div class="lobby-section-title">PLAYERS</div>
+              <div id="roomRoster" class="room-roster"></div>
+            </div>
+            <div>
+              <div class="lobby-section-title">PICK YOUR DISASTER</div>
+              <div id="lobbyCharacters" class="lobby-characters"></div>
+            </div>
+          </div>
+
+          <div id="lobbyNotice" class="status-box">Pick a character, join voice if you want, then ready up.</div>
+          <div class="lobby-actions">
+            <button id="leaveRoomBtn">Leave Room</button>
+            <button id="readyBtn" class="primary" disabled>READY UP</button>
+            <button id="hostStartBtn" class="primary host-start hidden" disabled>START THE DISASTER</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="gameScreen" class="screen game-screen">
+      <canvas id="gameCanvas"></canvas>
+      <div id="touchControls" class="touch-controls" aria-hidden="true">
+        <div id="touchJoystick" class="touch-joystick hidden"><div id="touchJoystickKnob" class="touch-joystick-knob"></div></div>
+        <div class="touch-actions">
+          <button id="touchMapBtn" class="touch-action touch-map" type="button"><span>MAP</span><b id="touchMapCount">5</b></button>
+          <button id="touchSpecialBtn" class="touch-action touch-special hidden" type="button"><span>USE</span><b>SPECIAL</b></button>
+          <button id="touchSprintBtn" class="touch-action touch-sprint" type="button"><span>HOLD</span><b>SPRINT</b></button>
+        </div>
+        <div id="touchHint" class="touch-hint">DRAG LEFT SIDE TO MOVE</div>
+      </div>
+      <div id="hud" class="hud">
+        <div class="hud-left">
+          <div class="hud-card stamina-card">
+            <span class="hud-label">SPRINT STAMINA</span>
+            <div class="stamina-track"><div id="staminaFill"></div></div>
+            <b id="staminaText">100%</b>
+          </div>
+          <div class="hud-card small-card"><span class="hud-label">MAP CHECKS</span><b id="mapChecks">5</b></div>
+          <div class="hud-card small-card"><span class="hud-label">OBJECTIVE</span><b id="objectiveText">EXIT</b></div>
+        </div>
+        <div class="hud-right">
+          <button id="soundBtn">SOUND: ON</button>
+          <button id="mapBtn">MAP [M]</button>
+          <button id="specialBtn" class="hidden">SPECIAL [E]</button>
+          <button id="menuBtn">QUIT</button>
+        </div>
+      </div>
+      <div class="controls-strip"><b>MOVE</b> WASD / ARROWS <span>•</span> <b>SPRINT</b> HOLD SHIFT <span>•</span> <b>MAP</b> M <span>•</span> <b>SPECIAL</b> E</div>
+      <div id="toiletRadar" class="toilet-radar hidden">
+        <div class="toilet-radar-icon">🚽</div>
+        <div class="toilet-radar-copy"><span>OPEN TOILET RADAR</span><b id="toiletBearing">LOCATING...</b><small id="toiletDistance">-- TILES</small></div>
+        <div id="toiletArrow" class="toilet-radar-arrow">➤</div>
+      </div>
+      <div id="voiceHud" class="voice-hud hidden"><div class="voice-hud-title">🎙 ROOM VOICE</div><div id="voiceHudPlayers"></div><button id="gameMuteMicBtn">MUTE</button></div>
+      <div id="spectatorHud" class="spectator-hud hidden">
+        <button id="spectatorPrevBtn" type="button" aria-label="Previous spectator view">◀</button>
+        <div class="spectator-copy"><span>🚽 YOU'RE SAFE — SPECTATING</span><b id="spectatorLabel">TOP-DOWN MAP</b><small>CLICK ◀ ▶ OR USE LEFT / RIGHT ARROWS</small></div>
+        <button id="spectatorNextBtn" type="button" aria-label="Next spectator view">▶</button>
+      </div>
+      <div id="panicCard" class="gut-card mega-gut">
+        <div class="mega-gut-top">
+          <div><span class="hud-label">GUT PANIC</span><strong id="panicStage" class="panic-stage">GREEN ZONE</strong></div>
+          <div class="mega-gut-readout"><span id="panicFace">🙂</span><b id="bowelText">0%</b><span id="panicWords">Suspiciously calm</span></div>
+        </div>
+        <div class="panic-track"><div id="bowelFill"></div><span id="poopMarker">💩</span></div>
+        <div id="crisisRisk" class="crisis-risk hidden">HOLD SHIFT = PANIC SPRINT • FASTER, BUT YOUR GUT FILLS FASTER TOO</div>
+      </div>
+      <div id="preCrisis" class="pre-crisis hidden"><div class="pre-crisis-kicker">⚠ ALL STOMACHS RUMBLING ⚠</div><div>THE BOWEL EVENT IS COMING</div><b id="preCrisisNumber">10</b></div>
+      <div id="panicFx" class="panic-fx"></div>
+      <div id="eventBanner" class="event-banner hidden"></div>
+      <div id="introCaption" class="intro-caption hidden"></div>
+      <div id="mapOverlay" class="map-overlay hidden">
+        <canvas id="mapCanvas"></canvas>
+        <div class="map-note">Full map peek. Your stomach noticed.</div>
+      </div>
+      <div id="countdown" class="countdown hidden"></div>
+    </section>
+
+    <section id="resultScreen" class="screen">
+      <div class="result-wrap">
+        <canvas id="resultCanvas"></canvas>
+        <div class="result-card">
+          <div id="resultWinnerArt" class="result-winner-art hidden" aria-hidden="true">
+            <img id="resultWinnerGhostA" class="result-winner-ghost ghost-a" alt="">
+            <img id="resultWinnerGhostB" class="result-winner-ghost ghost-b" alt="">
+            <img id="resultWinnerImage" class="result-winner-main winner-a" alt="">
+            <img id="resultWinnerImage2" class="result-winner-main winner-b hidden" alt="">
+          </div>
+          <div id="resultKicker" class="eyebrow">THE MAZE HAS SPOKEN</div>
+          <h2 id="resultTitle">Winner!</h2>
+          <p id="resultText"></p>
+          <div id="resultLevel" class="result-level"></div>
+          <div id="scoreboard" class="scoreboard hidden"><div class="scoreboard-title">TOTAL SCORE</div><div id="scoreboardRows"></div></div>
+          <div id="rematchCountdown" class="result-rematch hidden">
+            <span>NEXT FOOD COURT STARTS AUTOMATICALLY IN</span>
+            <b id="rematchSeconds">20</b>
+            <small id="rematchStatus">Nobody has to touch anything. Bad decisions resume automatically.</small>
+          </div>
+          <div class="result-actions"><button id="againBtn" class="primary">Race Again</button><button id="resultMenuBtn">Main Menu</button></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <script src="src/config/game-config.js?v=3.13-iso-voice"></script>
+  <script src="src/config/network-config.js?v=3.13-iso-voice"></script>
+  <script src="src/config/user-settings.js?v=3.13-iso-voice"></script>
+  <script src="src/data/characters.js?v=3.13-iso-voice"></script>
+  <script src="src/audio/audio-manager.js?v=3.13-iso-voice"></script>
+  <script src="src/network/multiplayer.js?v=3.13-iso-voice"></script>
+  <script src="src/network/voice-chat.js?v=3.13-iso-voice"></script>
+  <script src="src/game/game.js?v=3.13-iso-voice"></script>
+</body>
+</html>

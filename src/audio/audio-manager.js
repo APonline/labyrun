@@ -24,6 +24,7 @@ window.LabyrunAudio = (() => {
     alarm: 'assets/audio/sfx/bowel-alarm.mp3',
     poop: 'assets/audio/sfx/poop-fail.mp3',
     flush: 'assets/audio/sfx/toilet-flush.mp3',
+    special: 'assets/audio/sfx/special.mp3',
     belches: {
       tony: 'assets/audio/sfx/belches/tony-belch.mp3',
       barry: 'assets/audio/sfx/belches/barry-belch.mp3',
@@ -70,6 +71,8 @@ window.LabyrunAudio = (() => {
   let panicLevel = 0;
   let fartTimer = 0;
   let lastFartKey = '';
+  let voiceDuck = 0;
+  let voiceReleaseTimer = 0;
 
   function createGraph() {
     if (ctx) return;
@@ -93,8 +96,46 @@ window.LabyrunAudio = (() => {
     if (!ctx) return;
     const now = ctx.currentTime;
     const panicBoost = mode === 'panic' ? (1 + panicLevel * 0.28) : 1;
-    musicGain?.gain.setTargetAtTime(musicBaseGain() * panicBoost, now, 0.04);
-    sfxGain?.gain.setTargetAtTime(sfxBaseGain(), now, 0.04);
+    // Voice is the priority whenever a remote player is speaking. Music ducks
+    // much harder than SFX so gameplay feedback remains audible without
+    // competing with the conversation.
+    const musicDuck = 1 - voiceDuck * 0.76; // full duck => 24% of game music
+    const sfxDuck = 1 - voiceDuck * 0.52;   // full duck => 48% of game SFX
+    const tc = voiceDuck > 0 ? 0.055 : 0.18;
+    musicGain?.gain.setTargetAtTime(musicBaseGain() * panicBoost * musicDuck, now, tc);
+    sfxGain?.gain.setTargetAtTime(sfxBaseGain() * sfxDuck, now, tc);
+  }
+
+  function setVoiceActivity(level = 0, immediateRelease = false) {
+    const n = Math.max(0, Number(level) || 0);
+    // Voice meters normally sit around ~0.00-0.02 in silence and rise quickly
+    // during speech. Convert that into a smooth 0..1 duck amount.
+    const detected = n > 0.028;
+
+    const release = () => {
+      voiceDuck = 0;
+      voiceReleaseTimer = 0;
+      applyVolumes();
+    };
+
+    if (immediateRelease) {
+      if (voiceReleaseTimer) clearTimeout(voiceReleaseTimer);
+      voiceReleaseTimer = 0;
+      release();
+      return;
+    }
+
+    if (detected) {
+      if (voiceReleaseTimer) { clearTimeout(voiceReleaseTimer); voiceReleaseTimer = 0; }
+      voiceDuck = Math.max(0.72, Math.min(1, (n - 0.02) / 0.09));
+      ensure();
+      applyVolumes();
+      return;
+    }
+
+    // Meter updates arrive many times per second. Only arm the release once,
+    // otherwise continuous silence would keep pushing the timer forward forever.
+    if (voiceDuck > 0 && !voiceReleaseTimer) voiceReleaseTimer = setTimeout(release, 420);
   }
 
   function applyMute() {
@@ -143,6 +184,7 @@ window.LabyrunAudio = (() => {
       loadBuffer('alarm', ASSETS.alarm),
       loadBuffer('poop', ASSETS.poop),
       loadBuffer('flush', ASSETS.flush),
+      loadBuffer('special', ASSETS.special),
       ...Object.entries(ASSETS.belches).map(([key,url]) => loadBuffer(`belch-${key}`, url)),
 
       ...ASSETS.farts.map((url, i) =>
@@ -274,7 +316,7 @@ window.LabyrunAudio = (() => {
     if (!ctx) return;
     if (mode === 'panic' && source) {
       source.playbackRate.setTargetAtTime(1 + panicLevel * 0.18, ctx.currentTime, 0.08);
-      musicGain.gain.setTargetAtTime(musicBaseGain() * (1 + panicLevel * 0.28), ctx.currentTime, 0.08);
+      applyVolumes();
     }
   }
 
@@ -287,6 +329,7 @@ window.LabyrunAudio = (() => {
   function panicSting() { playSfx('alarm', 1); }
   function poopSting() { playSfx('poop', 1); }
   function flushSting() { playSfx('flush', 1); }
+  function specialSting() { playSfx('special', 0.95); }
   function playBelch(key) { playSfx(`belch-${key}`, 0.90); }
 
   function setMusicVolume(value) {
@@ -320,11 +363,13 @@ window.LabyrunAudio = (() => {
     panicSting,
     poopSting,
     flushSting,
+    specialSting,
     playBelch,
     playRandomFart,
     setMusicVolume,
     setSfxVolume,
     applyVolumes,
+    setVoiceActivity,
     toggleMute,
     stop,
     assets: ASSETS,
