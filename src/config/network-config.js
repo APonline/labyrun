@@ -1,9 +1,9 @@
 // LABYRUN MULTIPLAYER / VOICE CONFIG
 // DreamHost Shared can serve the frontend, but it cannot keep a Node/WebSocket
 // process alive. Deploy /server.js to Render/Railway/etc, then paste its HTTPS
-// URL below (for example: https://labyrun-socket.onrender.com).
+// URL below (for example: https://labyrun-socket.onrender.com). 
 window.LABYRUN_NETWORK_CONFIG = {
-  serverUrl: 'AUTO',
+  serverUrl: 'https://labyrun.onrender.com',
   roomSize: 4,
   reconnectGraceMs: 20000,
   snapshotHz: 15,

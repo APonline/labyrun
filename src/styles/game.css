@@ -628,3 +628,33 @@
 .character-usage-row{display:grid;grid-template-columns:36px 46px minmax(0,1fr) 74px;align-items:center;gap:9px;min-height:58px;padding:6px 9px;border:1px solid #40343c;border-radius:12px;background:#120f12}
 .character-usage-row.unused{opacity:.52}.character-usage-rank{font-size:13px;color:var(--acid);text-align:center}.character-usage-face{width:44px;height:44px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:#211a20;border:1px solid #4b3e46;font-weight:1000}.character-usage-face img{width:100%;height:100%;object-fit:contain}.character-usage-copy{min-width:0}.character-usage-copy strong{display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.character-usage-copy>span{display:block;height:6px;margin-top:6px;border-radius:999px;background:#2a2228;overflow:hidden}.character-usage-copy>span i{display:block;height:100%;min-width:0;background:var(--acid);border-radius:inherit}.character-usage-count{text-align:right}.character-usage-count>b{display:block;font-size:18px;color:#fff;line-height:1}.character-usage-count small{display:block;margin-top:4px;font-size:7px;color:#8f838a;font-weight:900;letter-spacing:.06em}
 @media(max-width:700px){.character-usage-list{grid-template-columns:1fr}.character-usage-row{grid-template-columns:32px 42px minmax(0,1fr) 66px;min-height:54px}.character-usage-face{width:40px;height:40px}}
+
+
+/* ============================================================
+   V4.2 — MULTIPLAYER RACER DETAIL / EDIT NOTES
+   ============================================================ */
+.lobby-character small{display:block;margin-top:2px;color:#8f818a;font-size:7px;font-weight:900;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lobby-character-detail{margin-top:10px;border:1px solid #493d45;background:#100d10;border-radius:13px;padding:10px;min-height:148px}
+.lobby-character-detail-empty{display:grid;place-items:center;min-height:125px;color:#847880;font-size:9px;text-align:center}
+.lobby-detail-head{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.lobby-detail-head>div:first-child>span,.lobby-detail-special>span,.lobby-detail-food>span{display:block;font-size:7px;font-weight:1000;letter-spacing:.13em;color:#8f818a}.lobby-detail-head>div:first-child>b{display:block;font-size:16px;color:#fff;margin:2px 0}.lobby-detail-head small,.lobby-detail-special small{display:block;color:#9c8f97;font-size:8px;line-height:1.3}.lobby-detail-food{display:grid;grid-template-columns:34px auto;grid-template-rows:auto auto;column-gap:7px;align-items:center;min-width:120px}.lobby-detail-food img{grid-row:1/3;width:34px;height:34px;object-fit:contain}.lobby-detail-food b{font-size:9px;color:var(--acid)}
+.lobby-detail-special{margin-top:8px;padding:8px;border-radius:9px;background:#1a141a;border:1px solid #342a31}.lobby-detail-special b{display:block;font-size:11px;color:#ead7ff;margin:2px 0}
+.lobby-detail-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.lobby-detail-stat{min-width:0}.lobby-detail-stat span{font-size:6px;color:#8c8087;font-weight:1000;letter-spacing:.08em}.lobby-detail-stat>b{float:right;font-size:8px;color:#fff}.lobby-detail-stat i{display:block;clear:both;height:5px;background:#2c242a;border-radius:99px;overflow:hidden;margin-top:3px}.lobby-detail-stat i em{display:block;height:100%;background:var(--acid);border-radius:inherit}
+@media(max-width:700px){.lobby-character small{display:none}.lobby-character-detail{min-height:135px}.lobby-detail-head{grid-template-columns:1fr}.lobby-detail-food{grid-template-columns:28px auto;min-width:0}.lobby-detail-food img{width:28px;height:28px}.lobby-detail-stats{grid-template-columns:repeat(2,1fr)}}
+
+/* ============================================================
+   V4.3 — GLOBAL BOOGER-GREEN SCROLLBARS
+   ============================================================ */
+html,body,*{
+  scrollbar-width:thin;
+  scrollbar-color:var(--acid) #171318;
+}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-track{background:#171318;border-radius:999px}
+*::-webkit-scrollbar-thumb{
+  background:linear-gradient(180deg,var(--acid),#86bb38);
+  border:2px solid #171318;
+  border-radius:999px;
+}
+*::-webkit-scrollbar-thumb:hover{background:#e6ff90}
+#characterScreen .character-panel{scrollbar-width:thin!important}
+#characterScreen .character-panel::-webkit-scrollbar{display:block!important;width:8px!important}

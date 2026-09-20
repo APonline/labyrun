@@ -25,6 +25,7 @@ window.LABYRUN_CHARACTERS = [
       }
     },
     favouriteFood:{name:'Taco',asset:'assets/items/foods/taco.png'},
+    stallAsset:'assets/world/food-stalls/taco-hut.webp',
     puppet:{skin:'#efb383',pants:'#d54735',hair:'#6a3822'},
     stats:{speed:1.00,bowelRate:1.00,sprint:1.00,stamina:1.00,mapChecks:0,mapPenalty:1.00,highBowelSpeed:1.00},
     passive:'mapRush',
@@ -49,6 +50,7 @@ window.LABYRUN_CHARACTERS = [
       }
     },
     favouriteFood:{name:'Chili',asset:'assets/items/foods/chili.png'},
+    stallAsset:'assets/world/food-stalls/chili-hut.webp',
     puppet:{skin:'#efad82',pants:'#31436d',hair:'#4e2e1f'},
     stats:{speed:.99,bowelRate:.91,sprint:1.00,stamina:1.00,mapChecks:0,mapPenalty:1.00,highBowelSpeed:1.00},
     passive:'',
@@ -73,6 +75,7 @@ window.LABYRUN_CHARACTERS = [
       }
     },
     favouriteFood:{name:'Milkshake',asset:'assets/items/foods/milkshake.png'},
+    stallAsset:'assets/world/food-stalls/milkshake-hut.webp',
     puppet:{skin:'#efac86',pants:'#bb4d8f',hair:'#b45328'},
     stats:{speed:1.01,bowelRate:1.00,sprint:1.02,stamina:1.12,mapChecks:0,mapPenalty:1.00,highBowelSpeed:1.00},
     passive:'',
@@ -97,6 +100,7 @@ window.LABYRUN_CHARACTERS = [
       }
     },
     favouriteFood:{name:'Yogurt',asset:'assets/items/foods/yogurt.png'},
+    stallAsset:'assets/world/food-stalls/yogurt-hut.webp',
     puppet:{skin:'#efb38c',pants:'#3472ad',hair:'#704123'},
     stats:{speed:.98,bowelRate:1.00,sprint:1.00,stamina:1.00,mapChecks:0,mapPenalty:1.00,highBowelSpeed:1.18},
     passive:'',
@@ -121,6 +125,7 @@ window.LABYRUN_CHARACTERS = [
       }
     },
     favouriteFood:{name:'Beans',asset:'assets/items/foods/beans.png'},
+    stallAsset:'assets/world/food-stalls/beans-hut.webp',
     puppet:{skin:'#efb18d',pants:'#dd72ad',hair:'#a64f2d'},
     stats:{speed:1.00,bowelRate:1.03,sprint:1.00,stamina:1.00,mapChecks:1,mapPenalty:1.00,highBowelSpeed:1.00},
     passive:'',
@@ -145,6 +150,7 @@ window.LABYRUN_CHARACTERS = [
       }
     },
     favouriteFood:{name:'Prune Juice',asset:'assets/items/foods/prunejuice.png'},
+    stallAsset:'assets/world/food-stalls/prunejuice-hut.webp',
     puppet:{skin:'#efb28e',pants:'#4380bf',hair:'#a25b2e'},
     stats:{speed:1.00,bowelRate:1.05,sprint:1.10,stamina:.96,mapChecks:0,mapPenalty:1.00,highBowelSpeed:1.00},
     passive:'',
@@ -169,6 +175,7 @@ window.LABYRUN_CHARACTERS = [
       }
     },
     favouriteFood:{name:'Corn Dog',asset:'assets/items/foods/corndog.png'},
+    stallAsset:'assets/world/food-stalls/corndog-hut.webp',
     puppet:{skin:'#efb286',pants:'#727b4b',hair:'#a34f2c'},
     stats:{speed:.98,bowelRate:.98,sprint:1.00,stamina:1.00,mapChecks:0,mapPenalty:.50,highBowelSpeed:1.00},
     passive:'',
@@ -193,6 +200,7 @@ window.LABYRUN_CHARACTERS = [
       }
     },
     favouriteFood:{name:'Biryani',asset:'assets/items/foods/piryani.png'},
+    stallAsset:'assets/world/food-stalls/curry-hut.webp',
     puppet:{skin:'#d99b73',pants:'#df3d42',hair:'#281d25'},
     stats:{speed:1.10,bowelRate:1.16,sprint:1.02,stamina:.96,mapChecks:0,mapPenalty:1.00,highBowelSpeed:1.00},
     passive:'',

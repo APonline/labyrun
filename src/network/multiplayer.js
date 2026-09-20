@@ -31,10 +31,20 @@
       return fromQuery.replace(/\/$/,'');
     }
     const saved = localStorage.getItem('labyrun.multiplayerServer');
-    if(saved) return saved.replace(/\/$/,'');
+    if(saved){
+      const cleanSaved=saved.replace(/\/$/,'');
+      const sameStaticOrigin=['localhost','127.0.0.1'].includes(location.hostname) && cleanSaved===location.origin.replace(/\/$/,'');
+      if(!sameStaticOrigin) return cleanSaved;
+      // Clear an old static-preview URL that could never host Socket.IO.
+      localStorage.removeItem('labyrun.multiplayerServer');
+    }
     const configured = String(CFG.serverUrl || '').trim();
     if(configured && configured !== 'AUTO' && !configured.includes('YOUR_')) return configured.replace(/\/$/,'');
-    if(['localhost','127.0.0.1'].includes(location.hostname)) return location.origin;
+    // A static localhost preview does not contain the Node/Socket.IO server.
+    // Do not blindly reconnect to ws://localhost and flood DevTools with errors.
+    // Local multiplayer can still be targeted explicitly with ?server=... or a
+    // real serverUrl in network-config.js.
+    if(['localhost','127.0.0.1'].includes(location.hostname)) return '';
     return '';
   }
 

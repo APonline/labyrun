@@ -362,14 +362,17 @@ io.on('connection', socket => {
     const endedRaceId=room.game.id;
     applyScoreRows(room,payload?.scoreRows);
     room.game=null;
+    clearRematch(room);
     room.players.forEach(p=>p.ready=false);
 
-    // Build the rematch state BEFORE the end packet. That makes the end event
-    // self-contained, so clients cannot get stranded on REMATCH LOADING if the
-    // separate postgame packet arrives late or is dropped during reconnect.
-    const postgame=scheduleRematch(room,{emit:false});
-    io.to(room.code).emit('game:end',{...(payload||{}),raceId:endedRaceId,postgame});
-    emitPostgame(room);
+    // V4.3 product flow: results never auto-launch another race. The room stays
+    // alive as a normal lobby, defaults to the next court, and lets the host
+    // change mode/world/difficulty while everybody can switch racers and ready.
+    room.levelIndex=Math.min((room.levelIndex||0)+1,LEVEL_COUNT-1);
+    const standings=publicStandings(room);
+    io.to(room.code).emit('game:end',{...(payload||{}),raceId:endedRaceId,postgame:null,lobbyReady:true,nextLevelIndex:room.levelIndex,standings});
+    broadcastRoom(room);
+    io.to(room.code).emit('room:notice','Race complete. The same room is ready for setup changes and another run.');
   });
 
   for(const event of ['voice:offer','voice:answer','voice:candidate']){

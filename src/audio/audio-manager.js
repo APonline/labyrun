@@ -25,6 +25,7 @@ window.LabyrunAudio = (() => {
     poop: 'assets/audio/sfx/poop-fail.mp3',
     flush: 'assets/audio/sfx/toilet-flush.mp3',
     special: 'assets/audio/sfx/special.mp3',
+    oneup: 'assets/audio/sfx/one-up.mp3',
     belches: {
       tony: 'assets/audio/sfx/belches/tony-belch.mp3',
       barry: 'assets/audio/sfx/belches/barry-belch.mp3',
@@ -185,6 +186,7 @@ window.LabyrunAudio = (() => {
       loadBuffer('poop', ASSETS.poop),
       loadBuffer('flush', ASSETS.flush),
       loadBuffer('special', ASSETS.special),
+      loadBuffer('oneup', ASSETS.oneup),
       ...Object.entries(ASSETS.belches).map(([key,url]) => loadBuffer(`belch-${key}`, url)),
 
       ...ASSETS.farts.map((url, i) =>
@@ -330,6 +332,7 @@ window.LabyrunAudio = (() => {
   function poopSting() { playSfx('poop', 1); }
   function flushSting() { playSfx('flush', 1); }
   function specialSting() { playSfx('special', 0.95); }
+  function oneUpSting() { playSfx('oneup', 0.98); }
   function playBelch(key) { playSfx(`belch-${key}`, 0.90); }
 
   function setMusicVolume(value) {
@@ -364,6 +367,7 @@ window.LabyrunAudio = (() => {
     poopSting,
     flushSting,
     specialSting,
+    oneUpSting,
     playBelch,
     playRandomFart,
     setMusicVolume,
