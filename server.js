@@ -97,6 +97,7 @@ function publicRoom(room){
     levelIndex:room.levelIndex||0,
     modeId:room.modeId||'classic',
     difficultyId:room.difficultyId||'standard',
+    lastCompletedLevelIndex:Number.isInteger(room.lastCompletedLevelIndex)?room.lastCompletedLevelIndex:null,
     postgame:publicPostgame(room),
     players:[...room.players.values()].map(p=>({
       id:p.id,name:p.name,characterId:p.characterId||null,ready:!!p.ready,
@@ -237,7 +238,7 @@ io.on('connection', socket => {
     try{
       leaveRoom(socket);
       const code=makeCode();
-      const room={code,hostId:socket.id,players:new Map(),scoreboard:new Map(),game:null,postgame:null,rematchTimer:null,levelIndex:0,modeId:'classic',difficultyId:'standard',raceSeq:0,createdAt:Date.now()};
+      const room={code,hostId:socket.id,players:new Map(),scoreboard:new Map(),game:null,postgame:null,rematchTimer:null,levelIndex:0,lastCompletedLevelIndex:null,modeId:'classic',difficultyId:'standard',raceSeq:0,createdAt:Date.now()};
       rooms.set(code,room);
       joinRoom(socket,room,payload.name);
       ack({ok:true,code});
@@ -361,14 +362,15 @@ io.on('connection', socket => {
     if(!room?.game||socket.id!==room.hostId||!validRacePayload(room,payload))return;
     const endedRaceId=room.game.id;
     applyScoreRows(room,payload?.scoreRows);
+    const completedLevelIndex=Math.max(0,Math.min(LEVEL_COUNT-1,Number(room.game.levelIndex??room.levelIndex??0)|0));
     room.game=null;
     clearRematch(room);
     room.players.forEach(p=>p.ready=false);
 
-    // V4.3 product flow: results never auto-launch another race. The room stays
-    // alive as a normal lobby, defaults to the next court, and lets the host
-    // change mode/world/difficulty while everybody can switch racers and ready.
-    room.levelIndex=Math.min((room.levelIndex||0)+1,LEVEL_COUNT-1);
+    // V4.4 product flow: retain the exact completed court separately from the
+    // editable next-round selection so the lobby can always explain progression.
+    room.lastCompletedLevelIndex=completedLevelIndex;
+    room.levelIndex=Math.min(completedLevelIndex+1,LEVEL_COUNT-1);
     const standings=publicStandings(room);
     io.to(room.code).emit('game:end',{...(payload||{}),raceId:endedRaceId,postgame:null,lobbyReady:true,nextLevelIndex:room.levelIndex,standings});
     broadcastRoom(room);
